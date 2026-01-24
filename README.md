@@ -50,6 +50,28 @@ Visit: [https://jeisey.github.io/stormwatch/](https://jeisey.github.io/stormwatc
 3. Enter your 5-digit US ZIP code
 4. View your local weather data
 
+## Add to Home Screen
+
+StormWatch can be installed on your phone like a native app for quick access during emergencies.
+
+### iOS (iPhone/iPad)
+
+1. Open [https://jeisey.github.io/stormwatch/](https://jeisey.github.io/stormwatch/) in **Safari**
+2. Tap the **Share** button (square with arrow pointing up) at the bottom of the screen
+3. Scroll down and tap **"Add to Home Screen"**
+4. Edit the name if desired, then tap **Add**
+5. The StormWatch icon will appear on your home screen
+
+### Android
+
+1. Open [https://jeisey.github.io/stormwatch/](https://jeisey.github.io/stormwatch/) in **Chrome**
+2. Tap the **three-dot menu** (⋮) in the top-right corner
+3. Tap **"Add to Home screen"** or **"Install app"**
+4. Confirm by tapping **Add** or **Install**
+5. The StormWatch icon will appear on your home screen
+
+Once installed, the app will open in full-screen mode without browser navigation bars, providing a native app-like experience.
+
 ## Deployment to GitHub Pages
 
 1. Create a new repository on GitHub

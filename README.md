@@ -1,6 +1,6 @@
 # StormWatch — Local Weather Alerts
 
-A minimal, mobile-first weather emergency dashboard. Get real-time NWS alerts, forecasts, precipitation data, and regional weather news for any US ZIP code.
+A minimal, mobile-first weather emergency dashboard. Get real-time NWS alerts, forecasts, precipitation data, and regional weather news for any US ZIP code. Always verify with local authorities if unsure about any data.
 
 ## Features
 
@@ -41,7 +41,7 @@ The app features a dark theme optimized for readability during emergencies.
 
 ## Live Demo
 
-Visit: `https://[your-username].github.io/stormwatch/`
+Visit: [https://jeisey.github.io/stormwatch/](https://jeisey.github.io/stormwatch/)
 
 ## Quick Start
 
@@ -127,3 +127,4 @@ MIT License — Free to use, modify, and deploy.
 ---
 
 **Stay safe during severe weather.** 🌨️
+

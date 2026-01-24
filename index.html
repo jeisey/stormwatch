@@ -1,0 +1,3856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="description" content="Real-time weather alerts and emergency information for your area">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>StormWatch — Local Weather Alerts</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%230a0a0f'/><circle cx='50' cy='50' r='35' fill='none' stroke='%233b82f6' stroke-width='4'/><path d='M50 25 L50 50 L65 60' stroke='%233b82f6' stroke-width='4' fill='none' stroke-linecap='round'/></svg>">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --bg-card-hover: #22222e;
+      --text-primary: #f0f0f5;
+      --text-secondary: #8a8a9a;
+      --text-muted: #5a5a6a;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.3);
+      --alert-extreme: #dc2626;
+      --alert-extreme-bg: rgba(220, 38, 38, 0.15);
+      --alert-severe: #ea580c;
+      --alert-severe-bg: rgba(234, 88, 12, 0.15);
+      --alert-moderate: #eab308;
+      --alert-moderate-bg: rgba(234, 179, 8, 0.15);
+      --alert-minor: #22c55e;
+      --alert-minor-bg: rgba(34, 197, 94, 0.15);
+      --snow-color: #60a5fa;
+      --ice-color: #a78bfa;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-light: rgba(255, 255, 255, 0.04);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* App Container */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .header {
+      padding: 16px 20px 12px;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 24px;
+      height: 24px;
+      fill: var(--accent);
+    }
+
+    .logo-text {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .location-display {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .location-display .zip {
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .update-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* Tab Navigation */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 0 20px;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+
+    .tab::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transition: transform 0.2s;
+    }
+
+    .tab.active {
+      color: var(--text-primary);
+    }
+
+    .tab.active::after {
+      transform: scaleX(1);
+    }
+
+    .tab .badge {
+      position: absolute;
+      top: 6px;
+      right: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 8px;
+      height: 8px;
+      padding: 0;
+      border-radius: 50%;
+      background: var(--alert-extreme);
+      font-size: 0;
+      box-shadow: 0 0 0 2px var(--bg-primary);
+    }
+
+    .tab .badge.accent {
+      background: var(--accent);
+    }
+
+    .tab .badge.count {
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      top: 4px;
+      right: 2px;
+      font-size: 9px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: white;
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px 20px;
+      padding-bottom: calc(80px + var(--safe-bottom));
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-header h2 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    /* Alert Card */
+    .alert-card {
+      border-left: 3px solid var(--alert-severe);
+    }
+
+    .alert-card.extreme { border-left-color: var(--alert-extreme); background: var(--alert-extreme-bg); }
+    .alert-card.severe { border-left-color: var(--alert-severe); background: var(--alert-severe-bg); }
+    .alert-card.moderate { border-left-color: var(--alert-moderate); background: var(--alert-moderate-bg); }
+    .alert-card.minor { border-left-color: var(--alert-minor); background: var(--alert-minor-bg); }
+
+    .alert-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .alert-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      flex-shrink: 0;
+    }
+
+    .alert-badge.extreme { background: var(--alert-extreme); color: white; }
+    .alert-badge.severe { background: var(--alert-severe); color: white; }
+    .alert-badge.moderate { background: var(--alert-moderate); color: #1a1a24; }
+    .alert-badge.minor { background: var(--alert-minor); color: #1a1a24; }
+
+    .tips-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tips-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--text-primary);
+    }
+
+    .tips-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .alert-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 10px 0 6px;
+      line-height: 1.3;
+    }
+
+    .alert-timing {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      margin-bottom: 10px;
+    }
+
+    .alert-instruction {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-sm);
+    }
+
+    .alert-expand {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: background 0.2s;
+    }
+
+    .alert-expand:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .alert-details {
+      margin-top: 10px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      display: none;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .alert-details.expanded {
+      display: block;
+    }
+
+    /* Tips Panel */
+    .tips-panel {
+      margin-top: 12px;
+      padding: 14px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: var(--radius-sm);
+      display: none;
+    }
+
+    .tips-panel.expanded {
+      display: block;
+    }
+
+    .tips-panel h4 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tips-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .tips-panel li {
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 6px 0;
+      padding-left: 20px;
+      position: relative;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .tips-panel li:last-child {
+      border-bottom: none;
+    }
+
+    .tips-panel li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .no-alerts {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--text-muted);
+    }
+
+    .no-alerts-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 12px;
+      opacity: 0.5;
+    }
+
+    .no-alerts h3 {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .no-alerts p {
+      font-size: 13px;
+    }
+
+    /* Current Conditions */
+    .current-temp {
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .temp-value {
+      font-size: 56px;
+      font-weight: 300;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .temp-unit {
+      font-size: 24px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    .current-desc {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    .conditions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .condition-item {
+      text-align: center;
+    }
+
+    .condition-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .condition-value {
+      font-size: 16px;
+      font-weight: 500;
+      font-family: var(--font-mono);
+    }
+
+    /* Hourly Forecast */
+    .hourly-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 0;
+      margin: 0 -16px;
+      padding-left: 16px;
+      padding-right: 16px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .hourly-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hourly-item {
+      flex-shrink: 0;
+      width: 64px;
+      padding: 12px 8px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+      text-align: center;
+      border: 1px solid var(--border-light);
+    }
+
+    .hourly-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 8px;
+    }
+
+    .hourly-icon {
+      width: 28px;
+      height: 28px;
+      margin: 0 auto 8px;
+      opacity: 0.9;
+    }
+
+    .hourly-temp {
+      font-size: 16px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+
+    .hourly-precip {
+      font-size: 10px;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    /* Accumulation Chart */
+    .accumulation-card {
+      background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(167, 139, 250, 0.1));
+    }
+
+    .accumulation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .accumulation-legend {
+      display: flex;
+      gap: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.snow { background: var(--snow-color); }
+    .legend-dot.ice { background: var(--ice-color); }
+
+    .accumulation-chart {
+      margin-top: 16px;
+      position: relative;
+    }
+
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 140px;
+      padding-bottom: 36px;
+    }
+
+    .chart-bar-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      position: relative;
+    }
+
+    .chart-bar {
+      width: 100%;
+      max-width: 32px;
+      border-radius: 4px 4px 0 0;
+      transition: height 0.3s ease;
+      position: relative;
+    }
+
+    .chart-bar.snow {
+      background: linear-gradient(to top, var(--snow-color), rgba(96, 165, 250, 0.5));
+    }
+
+    .chart-bar.ice {
+      background: linear-gradient(to top, var(--ice-color), rgba(167, 139, 250, 0.5));
+    }
+
+    .chart-bar-value {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .chart-label {
+      position: absolute;
+      bottom: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .no-accumulation {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Probability Gauge */
+    .probability-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .probability-header {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .probability-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .prob-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .prob-label {
+      width: 60px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+
+    .prob-track {
+      flex: 1;
+      height: 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .prob-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .prob-fill.high { background: linear-gradient(90deg, #22c55e, #4ade80); }
+    .prob-fill.medium { background: linear-gradient(90deg, #eab308, #facc15); }
+    .prob-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+    .prob-value {
+      width: 36px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      text-align: right;
+    }
+
+    /* Daily Forecast */
+    .daily-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .daily-item:last-child {
+      border-bottom: none;
+    }
+
+    .daily-day {
+      width: 56px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .daily-icon {
+      width: 32px;
+      height: 32px;
+      margin-right: 12px;
+    }
+
+    .daily-desc {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding-right: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .daily-temps {
+      display: flex;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+
+    .daily-high {
+      font-weight: 600;
+    }
+
+    .daily-low {
+      color: var(--text-muted);
+    }
+
+    /* News Feed */
+    .news-item {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .news-item:last-child {
+      border-bottom: none;
+    }
+
+    .news-item a {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .news-source {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .news-title {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .news-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .news-region-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
+    }
+
+    /* Safety Tips Tab */
+    .tips-category {
+      margin-bottom: 16px;
+    }
+
+    .tips-category-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      cursor: pointer;
+    }
+
+    .tips-category-header h3 {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .tips-category-icon {
+      font-size: 20px;
+    }
+
+    .tips-category-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+      padding: 12px;
+      display: none;
+    }
+
+    .tips-category-content.expanded {
+      display: block;
+    }
+
+    .tips-category-content li {
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .tips-category-content li:last-child {
+      border-bottom: none;
+    }
+
+    .tips-category-content li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--alert-minor);
+    }
+
+    /* Bottom Bar */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      gap: 8px;
+      padding: 12px 20px;
+      padding-bottom: calc(12px + var(--safe-bottom));
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      z-index: 100;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 20px;
+      border-radius: var(--radius);
+      border: none;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      flex: 1;
+      background: var(--accent);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .btn-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 24px 20px;
+      padding-bottom: calc(24px + var(--safe-bottom));
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .modal h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .modal-input-group {
+      margin-bottom: 16px;
+    }
+
+    .modal-input-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .modal-input-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 18px;
+      letter-spacing: 0.1em;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .modal-input-group input:focus {
+      border-color: var(--accent);
+    }
+
+    .modal-input-group input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+    }
+
+    /* States */
+    .loading-state,
+    .error-state,
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      text-align: center;
+      padding: 32px 20px;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-state p,
+    .error-state p {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .error-state {
+      color: var(--alert-severe);
+    }
+
+    .error-state h3 {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .empty-state h3 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Hidden */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Disclaimer - shown at bottom of scrollable content */
+    .disclaimer {
+      padding: 16px 20px;
+      margin-top: 12px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Impact Timeline */
+    .timeline-event {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .timeline-event:last-child {
+      border-bottom: none;
+    }
+
+    .timeline-time {
+      flex-shrink: 0;
+      width: 70px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      padding-top: 2px;
+    }
+
+    .timeline-dot {
+      flex-shrink: 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-top: 4px;
+      background: var(--accent);
+    }
+
+    .timeline-dot.danger { background: var(--alert-extreme); }
+    .timeline-dot.warning { background: var(--alert-moderate); }
+    .timeline-dot.improving { background: var(--alert-minor); }
+    .timeline-dot.normal { background: var(--text-muted); }
+
+    .timeline-content {
+      flex: 1;
+    }
+
+    .timeline-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .timeline-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .no-timeline {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Action Checklist */
+    .checklist-section {
+      margin-bottom: 16px;
+    }
+
+    .checklist-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .checklist-priority {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .checklist-priority.urgent { color: var(--alert-extreme); }
+    .checklist-priority.soon { color: var(--alert-moderate); }
+    .checklist-priority.ready { color: var(--accent); }
+
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .checklist-item:last-child {
+      border-bottom: none;
+    }
+
+    .checklist-item.completed {
+      opacity: 0.5;
+    }
+
+    .checklist-item.completed .checklist-text {
+      text-decoration: line-through;
+    }
+
+    .checklist-checkbox {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      transition: all 0.2s;
+    }
+
+    .checklist-item.completed .checklist-checkbox {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .checklist-text {
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .no-checklist {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Supply Calculator */
+    .supply-input-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .supply-input-row label {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .supply-stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stepper-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .stepper-btn:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .stepper-value {
+      width: 40px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+
+    .supply-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .supply-item {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      text-align: center;
+    }
+
+    .supply-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .supply-amount {
+      font-size: 18px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      margin-bottom: 2px;
+    }
+
+    .supply-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .supply-note {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    /* Emergency Contacts */
+    .contact-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .contact-item:last-child {
+      border-bottom: none;
+    }
+
+    .contact-info {
+      flex: 1;
+    }
+
+    .contact-name {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .contact-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .contact-btn {
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .contact-btn:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .contact-btn.emergency {
+      background: var(--alert-extreme);
+      border-color: var(--alert-extreme);
+      color: white;
+    }
+
+    /* Responsive tweaks */
+    @media (min-width: 480px) {
+      .conditions-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .tab {
+        font-size: 13px;
+      }
+      .supply-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-top">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          <span class="logo-text">StormWatch</span>
+        </div>
+        <span class="update-time" id="updateTime">—</span>
+      </div>
+      <div class="location-display" id="locationDisplay">
+        Enter your ZIP code to begin
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="vital">Vital</button>
+      <button class="tab" data-tab="forecast">Forecast</button>
+      <button class="tab" data-tab="accumulation">Precip<span class="badge accent hidden" id="accumBadge"></span></button>
+      <button class="tab" data-tab="prepare">Prepare<span class="badge accent hidden" id="prepareBadge"></span></button>
+      <button class="tab" data-tab="news">News<span class="badge count hidden" id="newsBadge">0</span></button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main" id="mainContent">
+      <!-- Empty State (initial) -->
+      <div class="empty-state" id="emptyState">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.4; margin-bottom: 16px;">
+          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+        </svg>
+        <h3>Welcome to StormWatch</h3>
+        <p>Tap "Set Location" below to get started</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state hidden" id="loadingState">
+        <div class="loading-spinner"></div>
+        <p>Fetching weather data...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state hidden" id="errorState">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px;">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <h3>Unable to load data</h3>
+        <p id="errorMessage">Please try again</p>
+      </div>
+
+      <!-- Vital Tab -->
+      <div class="tab-content active" id="tab-vital">
+        <!-- Alerts Section -->
+        <div id="alertsContainer"></div>
+
+        <!-- Current Conditions -->
+        <div class="card" id="currentCard">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <h2>Current Conditions</h2>
+          </div>
+          <div class="card-body" id="currentBody">
+            <div class="current-temp">
+              <span class="temp-value" id="currentTemp">—</span>
+              <span class="temp-unit">°F</span>
+            </div>
+            <div class="current-desc" id="currentDesc">—</div>
+            <div class="conditions-grid">
+              <div class="condition-item">
+                <div class="condition-label">Humidity</div>
+                <div class="condition-value" id="currentHumidity">—%</div>
+              </div>
+              <div class="condition-item">
+                <div class="condition-label">Wind</div>
+                <div class="condition-value" id="currentWind">— mph</div>
+              </div>
+              <div class="condition-item">
+                <div class="condition-label">Visibility</div>
+                <div class="condition-value" id="currentVisibility">— mi</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Next 12 Hours -->
+        <div class="card" id="hourlyCard">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <h2>Next 12 Hours</h2>
+          </div>
+          <div class="card-body">
+            <div class="hourly-scroll" id="hourlyScroll"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forecast Tab -->
+      <div class="tab-content" id="tab-forecast">
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <h2>7-Day Forecast</h2>
+          </div>
+          <div class="card-body" id="dailyContainer"></div>
+        </div>
+      </div>
+
+      <!-- Precipitation Tab -->
+      <div class="tab-content" id="tab-accumulation">
+        <!-- Precipitation Probability -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+            <h2>Precipitation Chance</h2>
+          </div>
+          <div class="card-body" id="probabilityContainer">
+            <div class="no-accumulation">No significant precipitation expected</div>
+          </div>
+        </div>
+
+        <!-- Snow/Ice Accumulation (shown only when relevant) -->
+        <div class="card accumulation-card" id="accumulationCard">
+          <div class="card-header accumulation-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v20M4.93 4.93l4.24 4.24M19.07 4.93l-4.24 4.24M4.93 19.07l4.24-4.24M19.07 19.07l-4.24-4.24M2 12h4M18 12h4M12 10a2 2 0 100-4 2 2 0 000 4z"/>
+              </svg>
+              <h2>Snow & Ice Forecast</h2>
+            </div>
+            <div class="accumulation-legend">
+              <div class="legend-item"><span class="legend-dot snow"></span>Snow</div>
+              <div class="legend-item"><span class="legend-dot ice"></span>Ice</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="accumulation-chart" id="accumulationChart">
+              <div class="no-accumulation">No snow or ice expected</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wind Forecast -->
+        <div class="card" id="windCard">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+            </svg>
+            <h2>Wind Forecast</h2>
+          </div>
+          <div class="card-body" id="windContainer">
+            <div class="no-accumulation">No significant wind expected</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- News Tab -->
+      <div class="tab-content" id="tab-news">
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/>
+              <path d="M18 14h-8"/>
+              <path d="M15 18h-5"/>
+              <path d="M10 6h8v4h-8V6Z"/>
+            </svg>
+            <h2>Weather News</h2>
+          </div>
+          <div class="card-body">
+            <div class="news-region-note" id="newsRegionNote">
+              Showing news for your area and surrounding region
+            </div>
+            <div id="newsContainer">
+              <p style="color: var(--text-muted); font-size: 13px;">Weather news for your area will appear here</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prepare Tab -->
+      <div class="tab-content" id="tab-prepare">
+        <!-- Impact Timeline -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <h2>Impact Timeline</h2>
+          </div>
+          <div class="card-body" id="timelineContainer">
+            <div class="no-timeline">No weather impacts expected</div>
+          </div>
+        </div>
+
+        <!-- Action Checklist -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+            <h2>Action Checklist</h2>
+          </div>
+          <div class="card-body" id="checklistContainer">
+            <div class="no-checklist">No preparation needed — conditions are normal</div>
+          </div>
+        </div>
+
+        <!-- Supply Calculator -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <path d="M16 10a4 4 0 0 1-8 0"/>
+            </svg>
+            <h2>Supply Calculator</h2>
+          </div>
+          <div class="card-body">
+            <div class="supply-input-row">
+              <label for="householdSize">Household size:</label>
+              <div class="supply-stepper">
+                <button class="stepper-btn" id="btnHouseholdMinus">−</button>
+                <span class="stepper-value" id="householdValue">2</span>
+                <button class="stepper-btn" id="btnHouseholdPlus">+</button>
+              </div>
+            </div>
+            <div id="supplyResults"></div>
+          </div>
+        </div>
+
+        <!-- Emergency Contacts -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            <h2>Emergency Contacts</h2>
+          </div>
+          <div class="card-body" id="contactsContainer">
+            <div class="contact-item">
+              <div class="contact-info">
+                <div class="contact-name">Emergency Services</div>
+                <div class="contact-desc">Police, Fire, Medical</div>
+              </div>
+              <a href="tel:911" class="contact-btn emergency">911</a>
+            </div>
+            <div class="contact-item">
+              <div class="contact-info">
+                <div class="contact-name">Community Services</div>
+                <div class="contact-desc">Shelters, Food, Utilities</div>
+              </div>
+              <a href="tel:211" class="contact-btn">211</a>
+            </div>
+            <div class="contact-item">
+              <div class="contact-info">
+                <div class="contact-name">Poison Control</div>
+                <div class="contact-desc">24/7 Poison Help Line</div>
+              </div>
+              <a href="tel:1-800-222-1222" class="contact-btn">Call</a>
+            </div>
+            <div class="contact-item" id="nwsOfficeContact" style="display: none;">
+              <div class="contact-info">
+                <div class="contact-name">NWS Office</div>
+                <div class="contact-desc" id="nwsOfficeName">Local forecast office</div>
+              </div>
+              <a href="#" class="contact-btn" id="nwsOfficeLink" target="_blank">Web</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disclaimer - inside main so it scrolls with content -->
+      <div class="disclaimer" id="disclaimer">
+        Data from NWS & GDELT. Not official. Verify with local authorities.
+      </div>
+    </main>
+
+    <!-- Bottom Bar -->
+    <div class="bottom-bar">
+      <button class="btn btn-primary" id="btnLocation">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        Set Location
+      </button>
+      <button class="btn btn-secondary" id="btnRefresh" disabled>
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 2v6h-6"/>
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+          <path d="M3 22v-6h6"/>
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ZIP Modal -->
+    <div class="modal-overlay" id="zipModal">
+      <div class="modal">
+        <h2>Enter ZIP Code</h2>
+        <div class="modal-input-group">
+          <label for="zipInput">US ZIP Code</label>
+          <input type="text" id="zipInput" inputmode="numeric" pattern="[0-9]*" maxlength="5" placeholder="00000" autocomplete="postal-code">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="btnCancel">Cancel</button>
+          <button class="btn btn-primary" id="btnSubmitZip">Get Weather</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // StormWatch v2 — Weather Emergency Dashboard
+    // Enhanced with: Regional news, Snow/Ice probability, Alert tips
+    // =========================================================================
+
+    (function() {
+      'use strict';
+
+      // -----------------------------------------------------------------------
+      // Configuration
+      // -----------------------------------------------------------------------
+      const CONFIG = {
+        cache: {
+          zipGeo: 30 * 24 * 60 * 60 * 1000,
+          nwsPoints: 7 * 24 * 60 * 60 * 1000,
+          nwsStations: 7 * 24 * 60 * 60 * 1000,
+          nwsObservation: 5 * 60 * 1000,
+          nwsHourly: 15 * 60 * 1000,
+          nwsDaily: 30 * 60 * 1000,
+          nwsAlerts: 2 * 60 * 1000,
+          nwsGridpoint: 15 * 60 * 1000,
+          gdeltNews: 10 * 60 * 1000,
+        },
+        storage: {
+          prefix: 'sw:',
+          zipKey: 'sw:userZip',
+        },
+        api: {
+          zippopotam: 'https://api.zippopotam.us/us/',
+          nws: 'https://api.weather.gov/',
+          gdelt: 'https://api.gdeltproject.org/api/v2/doc/doc',
+        },
+      };
+
+      // -----------------------------------------------------------------------
+      // Alert Tips Database — Comprehensive NWS Event Type Mapping
+      // -----------------------------------------------------------------------
+      const ALERT_TIPS = {
+        // Winter Weather
+        'Winter Storm Warning': [
+          'Stay indoors if possible — travel will be dangerous',
+          'Keep emergency supplies: flashlight, batteries, water, non-perishable food',
+          'Charge all devices now in case of power outage',
+          'If you must travel, keep an emergency kit in your vehicle',
+          'Call 511 for road conditions before traveling',
+          'Clear snow from exhaust pipes if running car for heat'
+        ],
+        'Winter Storm Watch': [
+          'Monitor forecasts closely — warning may be issued',
+          'Stock up on food, water, and medications now',
+          'Prepare your home: insulate pipes, check heating system',
+          'Have a backup heating source ready (safely)',
+          'Fill your car with gas before the storm hits'
+        ],
+        'Winter Weather Advisory': [
+          'Use caution when driving — roads may be slick',
+          'Allow extra travel time or delay non-essential trips',
+          'Watch for ice on bridges and overpasses',
+          'Keep your cell phone charged when traveling'
+        ],
+        'Blizzard Warning': [
+          'DO NOT travel — you could become stranded',
+          'Stay indoors and avoid unnecessary exposure',
+          'Have supplies for several days without power',
+          'If caught outside, seek shelter immediately',
+          'Watch for signs of hypothermia and frostbite'
+        ],
+        'Ice Storm Warning': [
+          'Expect significant ice accumulation on all surfaces',
+          'Power outages are likely — prepare backup heat source',
+          'Stay off roads — even small ice amounts are dangerous',
+          'Stay away from power lines that may have fallen',
+          'Stock up on water — pipes may freeze'
+        ],
+        'Freezing Rain Advisory': [
+          'Roads and walkways will become slippery',
+          'Reduce speed and increase following distance',
+          'Watch for black ice — looks wet but is frozen',
+          'Bridges and overpasses freeze first'
+        ],
+        'Wind Chill Warning': [
+          'Frostbite can occur in minutes on exposed skin',
+          'Cover all exposed skin when outdoors',
+          'Limit time outside — hypothermia risk is high',
+          'Check on elderly neighbors and those without heat',
+          'Bring pets indoors'
+        ],
+        'Wind Chill Advisory': [
+          'Dress in layers with wind-resistant outer layer',
+          'Cover extremities: hands, feet, ears, nose',
+          'Watch for signs of frostbite: numbness, white skin',
+          'Limit outdoor activities'
+        ],
+        'Cold Weather Advisory': [
+          'Wear appropriate clothing: hat, gloves, layers',
+          'Keep pets indoors as much as possible',
+          'Check on elderly and vulnerable neighbors',
+          'If you lack shelter, call 211 for assistance',
+          'Never use generators or grills indoors'
+        ],
+        'Extreme Cold Warning': [
+          'Stay indoors — exposure can be life-threatening',
+          'If you must go out, cover ALL exposed skin',
+          'Watch for hypothermia signs: shivering, confusion, slurred speech',
+          'Keep emergency supplies in your vehicle if traveling',
+          'Never leave children or pets in vehicles'
+        ],
+        'Freeze Warning': [
+          'Protect plants by covering them or bringing indoors',
+          'Wrap exposed pipes to prevent freezing',
+          'Let faucets drip to prevent pipe bursts',
+          'Disconnect garden hoses from outdoor faucets'
+        ],
+        'Frost Advisory': [
+          'Cover tender plants or bring them indoors',
+          'Protect sensitive vegetation',
+          'May need to scrape ice from windshield in morning'
+        ],
+
+        // Severe Storms
+        'Tornado Warning': [
+          'TAKE SHELTER IMMEDIATELY in basement or interior room',
+          'Get away from windows, doors, and outside walls',
+          'Protect your head with arms or sturdy furniture',
+          'If in a vehicle, get out and lie flat in a ditch',
+          'Do NOT shelter under overpasses'
+        ],
+        'Tornado Watch': [
+          'Be prepared to take shelter on short notice',
+          'Know where your safe room is located',
+          'Keep weather radio or app alerts on',
+          'Have shoes and flashlight ready',
+          'Watch the sky for rotation, large hail, or dark clouds'
+        ],
+        'Severe Thunderstorm Warning': [
+          'Move indoors immediately',
+          'Stay away from windows and doors',
+          'Do not use corded phones or plumbing',
+          'If outside, avoid tall objects and open areas',
+          'If in a vehicle, stay inside with windows up'
+        ],
+        'Severe Thunderstorm Watch': [
+          'Monitor conditions — storms may develop',
+          'Know where to take shelter',
+          'Secure outdoor objects that could blow away',
+          'Have a flashlight ready in case of power outage'
+        ],
+
+        // Flooding
+        'Flash Flood Warning': [
+          'Move to higher ground IMMEDIATELY',
+          'Do NOT walk or drive through flood water',
+          '"Turn Around, Don\'t Drown" — 6 inches can knock you down',
+          'Stay off bridges over fast-moving water',
+          'If trapped in a vehicle, get out and move to higher ground'
+        ],
+        'Flash Flood Watch': [
+          'Be aware of streams, drainage channels, and low spots',
+          'Know your area\'s flood risk',
+          'Have an evacuation plan ready',
+          'Do not camp or park along streams'
+        ],
+        'Flood Warning': [
+          'Move to higher ground if in flood-prone area',
+          'Avoid walking or driving through flood waters',
+          'Stay away from flood-damaged buildings',
+          'Do not drink flood water — it may be contaminated'
+        ],
+        'Flood Watch': [
+          'Monitor weather updates and river levels',
+          'Be prepared to evacuate if necessary',
+          'Move valuables to higher levels of your home',
+          'Know your evacuation routes'
+        ],
+        'Coastal Flood Warning': [
+          'Move away from the shore and low-lying coastal areas',
+          'Do not drive into flooded roadways',
+          'Secure or move boats to safe locations'
+        ],
+
+        // Heat
+        'Excessive Heat Warning': [
+          'Stay in air-conditioned spaces as much as possible',
+          'Drink plenty of water even if not thirsty',
+          'Check on elderly, sick, and those without AC',
+          'Never leave children or pets in vehicles',
+          'Avoid strenuous outdoor activities',
+          'Know the signs of heat stroke: hot dry skin, confusion'
+        ],
+        'Heat Advisory': [
+          'Drink more fluids regardless of activity level',
+          'Stay in air-conditioned areas when possible',
+          'Take frequent breaks if working outdoors',
+          'Wear lightweight, light-colored clothing',
+          'Check on at-risk family, friends, and neighbors'
+        ],
+
+        // Wind
+        'High Wind Warning': [
+          'Secure loose outdoor objects',
+          'Avoid being outside in forested areas',
+          'Use caution when driving, especially high-profile vehicles',
+          'Watch for downed power lines and report them',
+          'Stay away from windows during wind gusts'
+        ],
+        'Wind Advisory': [
+          'Secure outdoor furniture and decorations',
+          'Use caution when driving',
+          'Be alert for falling branches and debris'
+        ],
+
+        // Tropical
+        'Hurricane Warning': [
+          'Complete storm preparations immediately',
+          'Evacuate if ordered by local officials',
+          'Board up windows and secure property',
+          'Have supplies for at least 7 days',
+          'Know your evacuation route and destination'
+        ],
+        'Hurricane Watch': [
+          'Review your hurricane plan and supply kit',
+          'Know your evacuation zone',
+          'Fuel vehicles and have cash on hand',
+          'Begin securing your property'
+        ],
+        'Tropical Storm Warning': [
+          'Complete preparations for tropical storm conditions',
+          'Stay indoors during the storm',
+          'Stay away from windows during high winds'
+        ],
+        'Storm Surge Warning': [
+          'Life-threatening inundation from rising water possible',
+          'Evacuate immediately if in surge zone',
+          'Move to higher ground away from coast'
+        ],
+
+        // Fire
+        'Red Flag Warning': [
+          'Avoid activities that could start fires',
+          'Report any smoke or fire immediately',
+          'Have evacuation plan ready if in fire-prone area',
+          'Check that defensible space around home is maintained'
+        ],
+        'Fire Weather Watch': [
+          'Be extra cautious with any fire sources',
+          'Monitor conditions — Red Flag Warning may be issued',
+          'Review your evacuation plan'
+        ],
+
+        // Other
+        'Dense Fog Advisory': [
+          'Slow down and use low-beam headlights',
+          'Increase following distance significantly',
+          'Use roadway reflectors as a guide',
+          'Do not stop on the road — pull completely off if needed'
+        ],
+        'Air Quality Alert': [
+          'Limit outdoor activities, especially strenuous exercise',
+          'Keep windows closed and use air conditioning',
+          'People with respiratory conditions should stay indoors',
+          'Consider wearing N95 mask if outdoors'
+        ],
+
+        // Default tips for unknown alert types
+        'default': [
+          'Monitor official sources for updates',
+          'Follow instructions from local authorities',
+          'Have emergency supplies ready',
+          'Know your evacuation routes',
+          'Check on neighbors who may need assistance'
+        ]
+      };
+
+      // Alias similar alert types to main tips
+      const ALERT_ALIASES = {
+        'Snow Squall Warning': 'Winter Weather Advisory',
+        'Lake Effect Snow Warning': 'Winter Storm Warning',
+        'Lake Effect Snow Advisory': 'Winter Weather Advisory',
+        'Sleet Warning': 'Winter Storm Warning',
+        'Sleet Advisory': 'Winter Weather Advisory',
+        'Freezing Fog Advisory': 'Dense Fog Advisory',
+        'Extreme Cold Watch': 'Cold Weather Advisory',
+        'Hard Freeze Warning': 'Freeze Warning',
+        'Freeze Watch': 'Frost Advisory',
+        'Excessive Heat Watch': 'Heat Advisory',
+        'Flash Flood Emergency': 'Flash Flood Warning',
+        'Tornado Emergency': 'Tornado Warning',
+        'Dust Storm Warning': 'High Wind Warning',
+        'Special Weather Statement': 'default',
+        'Hazardous Weather Outlook': 'default',
+      };
+
+      // -----------------------------------------------------------------------
+      // Preparation Tasks Database — Action Items by Alert Type
+      // -----------------------------------------------------------------------
+      const PREPARATION_TASKS = {
+        // Winter Weather
+        'Winter Storm Warning': {
+          urgent: [
+            'Charge all phones and portable batteries NOW',
+            'Fill bathtub with water for flushing toilets if power goes out',
+            'Move cars into garage or away from trees',
+            'Bring pets inside',
+          ],
+          soon: [
+            'Stock up on water (1 gallon per person per day)',
+            'Get cash from ATM (cards may not work without power)',
+            'Fill prescriptions if running low',
+            'Gather flashlights, candles, and extra batteries',
+            'Locate your snow shovel and ice melt',
+          ],
+          ready: [
+            'Have warm layers and blankets accessible',
+            'Know where your circuit breaker is',
+            'Have a manual can opener available',
+            'Keep your car gas tank at least half full',
+          ]
+        },
+        'Winter Storm Watch': {
+          urgent: [],
+          soon: [
+            'Go grocery shopping before the rush',
+            'Fill your car with gas',
+            'Make sure you have enough medications',
+            'Charge devices and portable batteries',
+          ],
+          ready: [
+            'Check that you have flashlights with working batteries',
+            'Know where warm blankets are stored',
+            'Have non-perishable food ready',
+            'Test your backup heating source if you have one',
+          ]
+        },
+        'Blizzard Warning': {
+          urgent: [
+            'DO NOT plan any travel — stay home',
+            'Charge all devices immediately',
+            'Fill bathtub for emergency water',
+            'Bring outdoor pets inside now',
+            'Move vehicles to protected areas',
+          ],
+          soon: [
+            'Prepare for extended power outage (possibly days)',
+            'Stock extra water and food',
+            'Have cash on hand',
+            'Inform family of your plans to stay home',
+          ],
+          ready: [
+            'Have emergency kit easily accessible',
+            'Know how to safely use alternative heat',
+            'Keep snow removal tools ready',
+            'Have a battery-powered radio available',
+          ]
+        },
+        'Ice Storm Warning': {
+          urgent: [
+            'Charge everything NOW — power outages are very likely',
+            'Park cars away from trees and power lines',
+            'Fill containers with drinking water',
+            'Stock up on batteries',
+          ],
+          soon: [
+            'Get cash — ATMs may not work without power',
+            'Fill prescriptions immediately',
+            'Buy extra bottled water',
+            'Consider staying with someone who has a generator',
+          ],
+          ready: [
+            'Have flashlights and candles ready',
+            'Know how to manually open your garage door',
+            'Have ice melt for walkways (avoid travel on roads)',
+            'Prepare for potentially extended outage',
+          ]
+        },
+        'Excessive Heat Warning': {
+          urgent: [
+            'Check that your AC is working',
+            'Close blinds/curtains on sunny windows',
+            'Fill water bottles and refrigerate',
+            'Check on elderly neighbors and family',
+          ],
+          soon: [
+            'Stock up on water and electrolyte drinks',
+            'Plan activities during cooler morning/evening hours',
+            'Identify cooling centers near you',
+            'Ensure pets have shade and water',
+          ],
+          ready: [
+            'Know the signs of heat exhaustion and heat stroke',
+            'Have a fan as backup if AC fails',
+            'Avoid using oven — it heats up your home',
+            'Wear light, loose clothing',
+          ]
+        },
+        'Heat Advisory': {
+          urgent: [],
+          soon: [
+            'Stock up on water and sports drinks',
+            'Plan outdoor activities for early morning',
+            'Check on vulnerable family and neighbors',
+          ],
+          ready: [
+            'Stay hydrated throughout the day',
+            'Take frequent breaks if working outside',
+            'Know cooling center locations',
+          ]
+        },
+        'Tornado Warning': {
+          urgent: [
+            'TAKE SHELTER NOW in basement or interior room',
+            'Get away from windows immediately',
+            'Grab your phone and a flashlight',
+            'If driving, get out and lie flat in a ditch',
+          ],
+          soon: [],
+          ready: []
+        },
+        'Tornado Watch': {
+          urgent: [
+            'Know where your safe room/shelter is',
+            'Keep your phone charged and nearby',
+          ],
+          soon: [
+            'Review your shelter plan with family',
+            'Put shoes near your bed if watch is overnight',
+            'Have flashlight accessible',
+            'Watch sky for rotating clouds, large hail',
+          ],
+          ready: [
+            'Keep weather radio or phone alerts on',
+            'Know the difference between Watch and Warning',
+          ]
+        },
+        'Flash Flood Warning': {
+          urgent: [
+            'Move to higher ground immediately if in low area',
+            'Do NOT drive through flooded roads',
+            'Stay away from streams and drainage areas',
+            'Call 911 if you are trapped',
+          ],
+          soon: [],
+          ready: []
+        },
+        'Flash Flood Watch': {
+          urgent: [],
+          soon: [
+            'Know if you are in a flood-prone area',
+            'Plan alternate routes that avoid low areas',
+            'Move valuables to higher floors if possible',
+            'Avoid camping near streams',
+          ],
+          ready: [
+            'Monitor weather updates frequently',
+            'Have evacuation plan ready',
+            'Know where higher ground is near you',
+          ]
+        },
+        'Hurricane Warning': {
+          urgent: [
+            'Complete all storm preparations NOW',
+            'Board up remaining windows',
+            'Fill vehicles with gas immediately',
+            'Evacuate if in evacuation zone',
+          ],
+          soon: [
+            'Secure all outdoor items',
+            'Stock 7+ days of water and food',
+            'Get cash — ATMs may be down for days',
+            'Charge all devices and battery packs',
+            'Fill bathtubs with water',
+          ],
+          ready: [
+            'Have important documents in waterproof container',
+            'Know your evacuation route',
+            'Have pet supplies ready',
+            'Turn refrigerator to coldest setting',
+          ]
+        },
+        'High Wind Warning': {
+          urgent: [
+            'Bring in all loose outdoor items NOW',
+            'Park away from trees',
+            'Stay away from windows during gusts',
+          ],
+          soon: [
+            'Secure trash cans and patio furniture',
+            'Check that nothing can blow into windows',
+            'Have flashlight ready in case of power outage',
+          ],
+          ready: [
+            'Avoid travel if possible, especially in high-profile vehicles',
+            'Keep phone charged',
+          ]
+        },
+        'default': {
+          urgent: [],
+          soon: [
+            'Monitor official weather updates',
+            'Keep your phone charged',
+            'Have emergency supplies accessible',
+          ],
+          ready: [
+            'Know your evacuation routes',
+            'Check on vulnerable neighbors',
+            'Review your emergency plan',
+          ]
+        }
+      };
+
+      // Aliases for preparation tasks
+      const PREPARATION_ALIASES = {
+        'Winter Weather Advisory': 'Winter Storm Watch',
+        'Wind Chill Warning': 'Winter Storm Warning',
+        'Wind Chill Advisory': 'Winter Storm Watch',
+        'Extreme Cold Warning': 'Winter Storm Warning',
+        'Cold Weather Advisory': 'Winter Storm Watch',
+        'Freezing Rain Advisory': 'Ice Storm Warning',
+        'Severe Thunderstorm Warning': 'Tornado Watch',
+        'Severe Thunderstorm Watch': 'Tornado Watch',
+        'Flood Warning': 'Flash Flood Watch',
+        'Flood Watch': 'Flash Flood Watch',
+        'Hurricane Watch': 'Hurricane Warning',
+        'Tropical Storm Warning': 'Hurricane Warning',
+        'Storm Surge Warning': 'Hurricane Warning',
+        'Wind Advisory': 'High Wind Warning',
+        'Red Flag Warning': 'High Wind Warning',
+      };
+
+      // -----------------------------------------------------------------------
+      // State
+      // -----------------------------------------------------------------------
+      let state = {
+        zip: null,
+        location: null,
+        data: null,
+        isLoading: false,
+        error: null,
+        lastUpdate: null,
+      };
+
+      // -----------------------------------------------------------------------
+      // DOM Elements
+      // -----------------------------------------------------------------------
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => document.querySelectorAll(sel);
+
+      const DOM = {
+        updateTime: $('#updateTime'),
+        locationDisplay: $('#locationDisplay'),
+        emptyState: $('#emptyState'),
+        loadingState: $('#loadingState'),
+        errorState: $('#errorState'),
+        errorMessage: $('#errorMessage'),
+        alertsContainer: $('#alertsContainer'),
+        currentTemp: $('#currentTemp'),
+        currentDesc: $('#currentDesc'),
+        currentHumidity: $('#currentHumidity'),
+        currentWind: $('#currentWind'),
+        currentVisibility: $('#currentVisibility'),
+        hourlyScroll: $('#hourlyScroll'),
+        dailyContainer: $('#dailyContainer'),
+        newsContainer: $('#newsContainer'),
+        newsRegionNote: $('#newsRegionNote'),
+        newsBadge: $('#newsBadge'),
+        accumBadge: $('#accumBadge'),
+        accumulationCard: $('#accumulationCard'),
+        accumulationChart: $('#accumulationChart'),
+        probabilityContainer: $('#probabilityContainer'),
+        windContainer: $('#windContainer'),
+        prepareBadge: $('#prepareBadge'),
+        timelineContainer: $('#timelineContainer'),
+        checklistContainer: $('#checklistContainer'),
+        supplyResults: $('#supplyResults'),
+        householdValue: $('#householdValue'),
+        btnHouseholdMinus: $('#btnHouseholdMinus'),
+        btnHouseholdPlus: $('#btnHouseholdPlus'),
+        nwsOfficeContact: $('#nwsOfficeContact'),
+        nwsOfficeName: $('#nwsOfficeName'),
+        nwsOfficeLink: $('#nwsOfficeLink'),
+        btnLocation: $('#btnLocation'),
+        btnRefresh: $('#btnRefresh'),
+        zipModal: $('#zipModal'),
+        zipInput: $('#zipInput'),
+        btnCancel: $('#btnCancel'),
+        btnSubmitZip: $('#btnSubmitZip'),
+        tabs: $$('.tab'),
+        tabContents: $$('.tab-content'),
+        currentCard: $('#currentCard'),
+        hourlyCard: $('#hourlyCard'),
+      };
+
+      // -----------------------------------------------------------------------
+      // Utility Functions
+      // -----------------------------------------------------------------------
+      function sleep(ms) {
+        return new Promise(r => setTimeout(r, ms));
+      }
+
+      function cacheKey(url) {
+        return CONFIG.storage.prefix + 'cache:' + url;
+      }
+
+      function readCache(url) {
+        try {
+          const raw = localStorage.getItem(cacheKey(url));
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function writeCache(url, data, ttl) {
+        try {
+          localStorage.setItem(cacheKey(url), JSON.stringify({
+            data,
+            savedAt: Date.now(),
+            ttl,
+          }));
+        } catch {
+          clearOldCache();
+        }
+      }
+
+      function clearOldCache() {
+        const prefix = CONFIG.storage.prefix + 'cache:';
+        const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+        keys.slice(0, Math.floor(keys.length / 2)).forEach(k => localStorage.removeItem(k));
+      }
+
+      async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+        let attempt = 0;
+        
+        // Add User-Agent for NWS API compliance
+        const isNwsRequest = url.includes('api.weather.gov');
+        
+        while (attempt < maxRetries) {
+          try {
+            const res = await fetch(url, {
+              ...options,
+              headers: {
+                'Accept': 'application/geo+json, application/json',
+                ...(isNwsRequest && { 'User-Agent': '(StormWatch, github.io)' }),
+                ...options.headers,
+              },
+            });
+
+            if (res.ok) return res;
+            if (res.status === 304) return res;
+
+            if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
+              const retryAfter = res.headers.get('Retry-After');
+              const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+              await sleep(Math.min(waitMs, 8000));
+              attempt++;
+              continue;
+            }
+
+            throw new Error(`HTTP ${res.status}`);
+          } catch (err) {
+            if (attempt >= maxRetries - 1) throw err;
+            await sleep(Math.pow(2, attempt) * 1000);
+            attempt++;
+          }
+        }
+      }
+
+      async function cachedFetch(url, ttl) {
+        const cached = readCache(url);
+        const now = Date.now();
+
+        if (cached && (now - cached.savedAt) < cached.ttl) {
+          return cached.data;
+        }
+
+        const res = await fetchWithRetry(url);
+        const data = await res.json();
+        writeCache(url, data, ttl);
+        return data;
+      }
+
+      // -----------------------------------------------------------------------
+      // Unit Conversions
+      // -----------------------------------------------------------------------
+      const cToF = (c) => c != null ? Math.round((c * 9/5) + 32) : null;
+      const mpsToMph = (mps) => mps != null ? Math.round(mps * 2.237) : null;
+      const metersToMiles = (m) => m != null ? (m / 1609.344).toFixed(1) : null;
+      const mmToInches = (mm) => mm != null ? (mm / 25.4).toFixed(2) : null;
+
+      // -----------------------------------------------------------------------
+      // API Functions
+      // -----------------------------------------------------------------------
+      async function getGeoFromZip(zip) {
+        const url = CONFIG.api.zippopotam + zip;
+        const data = await cachedFetch(url, CONFIG.cache.zipGeo);
+        
+        const place = data?.places?.[0];
+        if (!place) throw new Error('ZIP code not found');
+
+        return {
+          zip,
+          city: place['place name'],
+          state: place['state abbreviation'],
+          stateFull: place['state'],
+          lat: parseFloat(place.latitude),
+          lon: parseFloat(place.longitude),
+        };
+      }
+
+      async function getNwsPoints(lat, lon) {
+        const url = `${CONFIG.api.nws}points/${lat},${lon}`;
+        const data = await cachedFetch(url, CONFIG.cache.nwsPoints);
+        
+        const p = data?.properties;
+        if (!p?.forecast) throw new Error('NWS points lookup failed');
+
+        // Extract county name from zones API
+        let countyName = null;
+        if (p.county) {
+          try {
+            const countyData = await cachedFetch(p.county, CONFIG.cache.nwsPoints);
+            countyName = countyData?.properties?.name || null;
+          } catch {
+            // Fall back to null if county lookup fails
+          }
+        }
+        
+        const relativeLocation = p.relativeLocation?.properties || {};
+
+        return {
+          forecastUrl: p.forecast,
+          forecastHourlyUrl: p.forecastHourly,
+          forecastGridDataUrl: p.forecastGridData,
+          stationsUrl: p.observationStations,
+          office: p.gridId,
+          gridX: p.gridX,
+          gridY: p.gridY,
+          county: countyName,
+          nearbyCity: relativeLocation.city || null,
+          nearbyState: relativeLocation.state || null,
+        };
+      }
+
+      async function getNwsAlerts(lat, lon) {
+        const url = `${CONFIG.api.nws}alerts/active?point=${lat},${lon}`;
+        const data = await cachedFetch(url, CONFIG.cache.nwsAlerts);
+        return (data?.features || []).map(f => f.properties).filter(Boolean);
+      }
+
+      async function getNwsHourly(url) {
+        const data = await cachedFetch(url, CONFIG.cache.nwsHourly);
+        return data?.properties?.periods || [];
+      }
+
+      async function getNwsDaily(url) {
+        const data = await cachedFetch(url, CONFIG.cache.nwsDaily);
+        return data?.properties?.periods || [];
+      }
+
+      async function getNwsGridpoint(office, gridX, gridY) {
+        const url = `${CONFIG.api.nws}gridpoints/${office}/${gridX},${gridY}`;
+        try {
+          const data = await cachedFetch(url, CONFIG.cache.nwsGridpoint);
+          return data?.properties || null;
+        } catch {
+          return null;
+        }
+      }
+
+      async function getStationsList(url) {
+        const data = await cachedFetch(url, CONFIG.cache.nwsStations);
+        return data?.features || [];
+      }
+
+      function pickStationId(stations) {
+        const first = stations?.[0];
+        const id = first?.properties?.stationIdentifier || first?.id;
+        if (!id) throw new Error('No observation station found');
+        return String(id).split('/').pop();
+      }
+
+      async function getLatestObservation(stationId) {
+        const url = `${CONFIG.api.nws}stations/${stationId}/observations/latest`;
+        const data = await cachedFetch(url, CONFIG.cache.nwsObservation);
+        return data?.properties || null;
+      }
+
+      // Enhanced news fetch with regional coverage
+      async function getGdeltNews(location, points) {
+        // Strategy: Search by state for broad coverage, since small towns rarely appear in news
+        // State-level search captures regional weather news that affects the whole area
+        const stateName = location.stateFull || location.state;
+        const nearbyCity = points.nearbyCity;
+        
+        // Try multiple search strategies and combine results
+        const queries = [];
+        
+        // Primary: State-level weather news (best coverage for suburbs)
+        if (stateName) {
+          queries.push(`winter storm snow weather "${stateName}"`);
+        }
+        
+        // Secondary: Nearby city if it's a decent-sized place (might get metro coverage)
+        if (nearbyCity && nearbyCity !== location.city) {
+          queries.push(`storm snow weather "${nearbyCity}"`);
+        }
+        
+        // Tertiary: County-level
+        if (points.county) {
+          queries.push(`storm weather "${points.county}"`);
+        }
+        
+        console.log('[GDELT] Search locations:', { stateName, nearbyCity, county: points.county, userCity: location.city });
+        
+        // Fetch from primary query (state-level for best coverage)
+        const primaryQuery = queries[0] || `storm weather "${location.city}"`;
+        
+        const params = new URLSearchParams({
+          mode: 'ArtList',
+          format: 'json',
+          sort: 'DateDesc',
+          maxrecords: '30',
+          timespan: '7d',
+        });
+        
+        const encodedQuery = encodeURIComponent(primaryQuery);
+        const url = `${CONFIG.api.gdelt}?query=${encodedQuery}&${params}`;
+        
+        console.log('[GDELT] Query URL:', url);
+        
+        try {
+          const data = await cachedFetch(url, CONFIG.cache.gdeltNews);
+          console.log('[GDELT] Response:', data);
+          console.log('[GDELT] Articles count:', data?.articles?.length || 0);
+          return {
+            articles: data?.articles || [],
+            regionInfo: {
+              searchArea: stateName || nearbyCity || location.city,
+              nearbyCity: nearbyCity,
+              county: points.county,
+            }
+          };
+        } catch (err) {
+          console.error('[GDELT] Error:', err);
+          return { articles: [], regionInfo: {} };
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // Main Data Loader
+      // -----------------------------------------------------------------------
+      async function loadWeatherData(zip) {
+        const location = await getGeoFromZip(zip);
+        const points = await getNwsPoints(location.lat, location.lon);
+
+        // Fetch in parallel including gridpoint data
+        const [alerts, hourly, daily, stations, newsData, gridpoint] = await Promise.all([
+          getNwsAlerts(location.lat, location.lon),
+          getNwsHourly(points.forecastHourlyUrl),
+          getNwsDaily(points.forecastUrl),
+          getStationsList(points.stationsUrl),
+          getGdeltNews(location, points),
+          getNwsGridpoint(points.office, points.gridX, points.gridY),
+        ]);
+
+        // Get current observation
+        let observation = null;
+        try {
+          const stationId = pickStationId(stations);
+          observation = await getLatestObservation(stationId);
+        } catch {}
+
+        // Process current conditions
+        const current = observation ? {
+          tempF: cToF(observation.temperature?.value),
+          description: observation.textDescription || '',
+          humidity: observation.relativeHumidity?.value != null 
+            ? Math.round(observation.relativeHumidity.value) 
+            : null,
+          windMph: mpsToMph(observation.windSpeed?.value),
+          windDir: observation.windDirection?.value,
+          visibilityMi: metersToMiles(observation.visibility?.value),
+        } : {
+          tempF: hourly[0]?.temperature,
+          description: hourly[0]?.shortForecast || '',
+          humidity: null,
+          windMph: null,
+          visibilityMi: null,
+        };
+
+        // Process accumulation data from gridpoint
+        const accumulation = processAccumulationData(gridpoint);
+        const probability = processProbabilityData(gridpoint, hourly);
+        const wind = processWindData(gridpoint, hourly);
+
+        return {
+          location,
+          points,
+          alerts: sortAlerts(alerts),
+          current,
+          hourly: hourly.slice(0, 12),
+          daily: processDailyForecast(daily),
+          news: dedupeNews(newsData.articles),
+          newsRegion: newsData.regionInfo,
+          accumulation,
+          probability,
+          wind,
+        };
+      }
+
+      // -----------------------------------------------------------------------
+      // Data Processing
+      // -----------------------------------------------------------------------
+      function sortAlerts(alerts) {
+        const severityOrder = { Extreme: 0, Severe: 1, Moderate: 2, Minor: 3, Unknown: 4 };
+        return alerts.sort((a, b) => {
+          const aOrder = severityOrder[a.severity] ?? 4;
+          const bOrder = severityOrder[b.severity] ?? 4;
+          return aOrder - bOrder;
+        });
+      }
+
+      function processDailyForecast(periods) {
+        const days = [];
+        const seen = new Set();
+
+        for (const period of periods) {
+          const name = period.name || '';
+          const baseDay = name.replace(/ Night$/, '').replace(/^Tonight$/, 'Today').replace(/^This Afternoon$/, 'Today');
+          
+          if (seen.has(baseDay)) continue;
+          seen.add(baseDay);
+
+          const nightPeriod = periods.find(p => 
+            p.name === baseDay + ' Night' || 
+            (baseDay === 'Today' && p.name === 'Tonight')
+          );
+
+          days.push({
+            name: baseDay,
+            high: period.isDaytime ? period.temperature : (nightPeriod?.temperature || period.temperature),
+            low: period.isDaytime ? (nightPeriod?.temperature || null) : period.temperature,
+            shortForecast: period.shortForecast,
+            icon: period.icon,
+          });
+
+          if (days.length >= 7) break;
+        }
+
+        return days;
+      }
+
+      function processAccumulationData(gridpoint) {
+        if (!gridpoint) return { snow: [], ice: [], hasData: false };
+
+        const snow = [];
+        const ice = [];
+        const now = new Date();
+        const next72h = new Date(now.getTime() + 72 * 60 * 60 * 1000);
+
+        // Process snowfall amount (in mm, convert to inches)
+        if (gridpoint.snowfallAmount?.values) {
+          for (const item of gridpoint.snowfallAmount.values) {
+            const time = parseNwsTime(item.validTime);
+            if (time && time >= now && time <= next72h && item.value > 0) {
+              snow.push({
+                time,
+                value: parseFloat(mmToInches(item.value)),
+                label: formatShortTime(time),
+              });
+            }
+          }
+        }
+
+        // Process ice accumulation (in mm, convert to inches)
+        if (gridpoint.iceAccumulation?.values) {
+          for (const item of gridpoint.iceAccumulation.values) {
+            const time = parseNwsTime(item.validTime);
+            if (time && time >= now && time <= next72h && item.value > 0) {
+              ice.push({
+                time,
+                value: parseFloat(mmToInches(item.value)),
+                label: formatShortTime(time),
+              });
+            }
+          }
+        }
+
+        // Aggregate into 6-hour windows for cleaner display
+        const snowAggregated = aggregateByWindow(snow, 6);
+        const iceAggregated = aggregateByWindow(ice, 6);
+
+        return {
+          snow: snowAggregated,
+          ice: iceAggregated,
+          hasData: snowAggregated.length > 0 || iceAggregated.length > 0,
+          totalSnow: snowAggregated.reduce((sum, s) => sum + s.value, 0),
+          totalIce: iceAggregated.reduce((sum, i) => sum + i.value, 0),
+        };
+      }
+
+      function processProbabilityData(gridpoint, hourly) {
+        const probData = [];
+        const now = new Date();
+
+        // Get probability of precipitation from gridpoint or hourly data
+        if (gridpoint?.probabilityOfPrecipitation?.values) {
+          const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          let maxProb = 0;
+
+          for (const item of gridpoint.probabilityOfPrecipitation.values) {
+            const time = parseNwsTime(item.validTime);
+            if (time && time >= now && time <= next24h && item.value != null) {
+              maxProb = Math.max(maxProb, item.value);
+            }
+          }
+
+          if (maxProb > 0) {
+            probData.push({ label: 'Next 24h', value: maxProb });
+          }
+        }
+
+        // Also get from hourly periods
+        const next12h = hourly.slice(0, 12);
+        const precipProbs = next12h
+          .filter(p => p.probabilityOfPrecipitation?.value != null)
+          .map(p => p.probabilityOfPrecipitation.value);
+
+        if (precipProbs.length > 0) {
+          const maxHourly = Math.max(...precipProbs);
+          if (maxHourly > 0 && !probData.find(p => p.label === 'Next 24h')) {
+            probData.push({ label: 'Next 12h', value: maxHourly });
+          }
+        }
+
+        return probData;
+      }
+
+      function processWindData(gridpoint, hourly) {
+        const windData = {
+          maxGust: null,
+          maxSustained: null,
+          hasSignificant: false,
+        };
+        const now = new Date();
+        const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+        // Get wind gust from gridpoint (in km/h, convert to mph)
+        if (gridpoint?.windGust?.values) {
+          for (const item of gridpoint.windGust.values) {
+            const time = parseNwsTime(item.validTime);
+            if (time && time >= now && time <= next24h && item.value != null) {
+              const mph = Math.round(item.value * 0.621371);
+              if (!windData.maxGust || mph > windData.maxGust) {
+                windData.maxGust = mph;
+              }
+            }
+          }
+        }
+
+        // Get sustained wind from gridpoint
+        if (gridpoint?.windSpeed?.values) {
+          for (const item of gridpoint.windSpeed.values) {
+            const time = parseNwsTime(item.validTime);
+            if (time && time >= now && time <= next24h && item.value != null) {
+              const mph = Math.round(item.value * 0.621371);
+              if (!windData.maxSustained || mph > windData.maxSustained) {
+                windData.maxSustained = mph;
+              }
+            }
+          }
+        }
+
+        // Fall back to hourly data
+        if (!windData.maxSustained && hourly.length > 0) {
+          for (const period of hourly.slice(0, 12)) {
+            const windStr = period.windSpeed || '';
+            const match = windStr.match(/(\d+)/);
+            if (match) {
+              const mph = parseInt(match[1]);
+              if (!windData.maxSustained || mph > windData.maxSustained) {
+                windData.maxSustained = mph;
+              }
+            }
+          }
+        }
+
+        // Mark as significant if gusts > 30 or sustained > 20
+        windData.hasSignificant = (windData.maxGust && windData.maxGust >= 30) || 
+                                   (windData.maxSustained && windData.maxSustained >= 20);
+
+        return windData;
+      }
+
+      function parseNwsTime(validTime) {
+        // NWS format: "2024-01-23T18:00:00+00:00/PT6H"
+        if (!validTime) return null;
+        const timePart = validTime.split('/')[0];
+        return new Date(timePart);
+      }
+
+      function formatShortTime(date) {
+        const day = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const hour = date.getHours();
+        const ampm = hour >= 12 ? 'p' : 'a';
+        const h = hour % 12 || 12;
+        return `${day} ${h}${ampm}`;
+      }
+
+      function aggregateByWindow(data, windowHours) {
+        if (!data.length) return [];
+
+        const windows = [];
+        let currentWindow = null;
+
+        for (const item of data.sort((a, b) => a.time - b.time)) {
+          const windowStart = new Date(Math.floor(item.time.getTime() / (windowHours * 60 * 60 * 1000)) * windowHours * 60 * 60 * 1000);
+          
+          if (!currentWindow || currentWindow.windowStart.getTime() !== windowStart.getTime()) {
+            if (currentWindow) windows.push(currentWindow);
+            currentWindow = {
+              windowStart,
+              value: item.value,
+              label: formatShortTime(windowStart),
+            };
+          } else {
+            currentWindow.value += item.value;
+          }
+        }
+
+        if (currentWindow) windows.push(currentWindow);
+
+        return windows.slice(0, 8); // Max 8 windows (48 hours)
+      }
+
+      function dedupeNews(articles) {
+        const seen = new Set();
+        return articles.filter(article => {
+          const key = article.title?.toLowerCase().substring(0, 50);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 15);
+      }
+
+      function getTipsForAlert(eventType) {
+        // Check direct match
+        if (ALERT_TIPS[eventType]) return ALERT_TIPS[eventType];
+        
+        // Check aliases
+        if (ALERT_ALIASES[eventType] && ALERT_TIPS[ALERT_ALIASES[eventType]]) {
+          return ALERT_TIPS[ALERT_ALIASES[eventType]];
+        }
+
+        // Fuzzy match by keywords
+        const lowerEvent = eventType.toLowerCase();
+        for (const [key, tips] of Object.entries(ALERT_TIPS)) {
+          if (key !== 'default' && lowerEvent.includes(key.toLowerCase().split(' ')[0])) {
+            return tips;
+          }
+        }
+
+        return ALERT_TIPS['default'];
+      }
+
+      // -----------------------------------------------------------------------
+      // Rendering
+      // -----------------------------------------------------------------------
+      function renderAlerts(alerts) {
+        const container = DOM.alertsContainer;
+        
+        if (!alerts || alerts.length === 0) {
+          container.innerHTML = `
+            <div class="card">
+              <div class="no-alerts">
+                <svg class="no-alerts-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <h3>No Active Alerts</h3>
+                <p>No weather alerts for your area</p>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = alerts.map((alert, idx) => {
+          const severity = (alert.severity || 'Unknown').toLowerCase();
+          const event = alert.event || 'Weather Alert';
+          const instruction = alert.instruction || '';
+          const description = alert.description || '';
+          const tips = getTipsForAlert(event);
+          
+          let timing = '';
+          if (alert.effective && alert.ends) {
+            const start = new Date(alert.effective);
+            const end = new Date(alert.ends);
+            timing = `${formatDateTime(start)} — ${formatDateTime(end)}`;
+          }
+
+          return `
+            <div class="card alert-card ${severity}">
+              <div class="card-body">
+                <div class="alert-header">
+                  <span class="alert-badge ${severity}">${severity.toUpperCase()}</span>
+                  <button class="tips-btn" onclick="toggleTips(${idx})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Safety Tips
+                  </button>
+                </div>
+                <h3 class="alert-title">${escapeHtml(event)}</h3>
+                ${timing ? `<div class="alert-timing">${timing}</div>` : ''}
+                ${instruction ? `
+                  <div class="alert-instruction">
+                    <strong>Action:</strong> ${escapeHtml(truncate(instruction, 300))}
+                  </div>
+                ` : ''}
+                <div class="tips-panel" id="tips-panel-${idx}">
+                  <h4>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    Safety Tips for ${escapeHtml(event)}
+                  </h4>
+                  <ul>
+                    ${tips.map(tip => `<li>${escapeHtml(tip)}</li>`).join('')}
+                  </ul>
+                </div>
+                ${description ? `
+                  <button class="alert-expand" onclick="toggleAlertDetails(${idx})">
+                    Show full NWS details ▼
+                  </button>
+                  <div class="alert-details" id="alert-details-${idx}">${escapeHtml(description)}</div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderCurrent(current) {
+        DOM.currentTemp.textContent = current.tempF != null ? current.tempF : '—';
+        DOM.currentDesc.textContent = current.description || '—';
+        DOM.currentHumidity.textContent = current.humidity != null ? `${current.humidity}%` : '—%';
+        DOM.currentWind.textContent = current.windMph != null ? `${current.windMph} mph` : '— mph';
+        DOM.currentVisibility.textContent = current.visibilityMi != null ? `${current.visibilityMi} mi` : '— mi';
+      }
+
+      function renderHourly(periods) {
+        DOM.hourlyScroll.innerHTML = periods.map(period => {
+          const time = new Date(period.startTime);
+          const hour = time.getHours();
+          const timeStr = hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`;
+          const precip = period.probabilityOfPrecipitation?.value;
+          
+          return `
+            <div class="hourly-item">
+              <div class="hourly-time">${timeStr}</div>
+              ${getWeatherIcon(period.shortForecast, period.isDaytime)}
+              <div class="hourly-temp">${period.temperature}°</div>
+              ${precip && precip > 20 ? `<div class="hourly-precip">${precip}%</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderDaily(days) {
+        DOM.dailyContainer.innerHTML = days.map(day => `
+          <div class="daily-item">
+            <div class="daily-day">${day.name.substring(0, 3)}</div>
+            ${getWeatherIcon(day.shortForecast, true, 'daily-icon')}
+            <div class="daily-desc">${escapeHtml(day.shortForecast)}</div>
+            <div class="daily-temps">
+              <span class="daily-high">${day.high ?? '—'}°</span>
+              <span class="daily-low">${day.low ?? '—'}°</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function renderAccumulation(accumulation) {
+        // Hide the entire card if no snow/ice data
+        if (!accumulation.hasData) {
+          DOM.accumulationCard.style.display = 'none';
+          DOM.accumBadge.classList.add('hidden');
+          return;
+        }
+
+        // Show the card
+        DOM.accumulationCard.style.display = 'block';
+
+        // Show badge if significant accumulation
+        if (accumulation.totalSnow >= 1 || accumulation.totalIce >= 0.1) {
+          DOM.accumBadge.classList.remove('hidden');
+        } else {
+          DOM.accumBadge.classList.add('hidden');
+        }
+
+        // Combine and sort all data points by time
+        const allData = [];
+        const snowMap = new Map(accumulation.snow.map(s => [s.windowStart.getTime(), s]));
+        const iceMap = new Map(accumulation.ice.map(i => [i.windowStart.getTime(), i]));
+        
+        const allTimes = new Set([
+          ...accumulation.snow.map(s => s.windowStart.getTime()),
+          ...accumulation.ice.map(i => i.windowStart.getTime())
+        ]);
+
+        for (const time of [...allTimes].sort((a, b) => a - b)) {
+          allData.push({
+            time,
+            label: formatShortTime(new Date(time)),
+            snow: snowMap.get(time)?.value || 0,
+            ice: iceMap.get(time)?.value || 0,
+          });
+        }
+
+        // Calculate max for scale
+        const maxVal = Math.max(
+          ...allData.map(d => d.snow),
+          ...allData.map(d => d.ice),
+          1
+        );
+
+        const chartHtml = `
+          <div class="chart-bars">
+            ${allData.slice(0, 8).map(d => {
+              const snowHeight = (d.snow / maxVal) * 80;
+              const iceHeight = (d.ice / maxVal) * 80;
+              return `
+                <div class="chart-bar-group">
+                  ${d.snow > 0 ? `
+                    <div class="chart-bar snow" style="height: ${Math.max(snowHeight, 4)}px;">
+                      <span class="chart-bar-value">${d.snow.toFixed(1)}"</span>
+                    </div>
+                  ` : ''}
+                  ${d.ice > 0 ? `
+                    <div class="chart-bar ice" style="height: ${Math.max(iceHeight, 4)}px;">
+                      <span class="chart-bar-value">${d.ice.toFixed(2)}"</span>
+                    </div>
+                  ` : ''}
+                  ${d.snow === 0 && d.ice === 0 ? `<div style="height: 4px;"></div>` : ''}
+                  <span class="chart-label">${d.label}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-around; text-align: center;">
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">TOTAL SNOW</div>
+              <div style="font-size: 20px; font-weight: 600; font-family: var(--font-mono); color: var(--snow-color);">${accumulation.totalSnow.toFixed(1)}"</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">TOTAL ICE</div>
+              <div style="font-size: 20px; font-weight: 600; font-family: var(--font-mono); color: var(--ice-color);">${accumulation.totalIce.toFixed(2)}"</div>
+            </div>
+          </div>
+        `;
+
+        DOM.accumulationChart.innerHTML = chartHtml;
+      }
+
+      function renderProbability(probability) {
+        if (!probability || probability.length === 0) {
+          DOM.probabilityContainer.innerHTML = `
+            <div style="text-align: center; padding: 16px; color: var(--text-muted);">
+              <div style="font-size: 32px; margin-bottom: 8px;">☀️</div>
+              <div style="font-size: 13px;">No precipitation expected</div>
+            </div>
+          `;
+          return;
+        }
+
+        DOM.probabilityContainer.innerHTML = `
+          <div class="probability-bars">
+            ${probability.map(p => {
+              const level = p.value >= 70 ? 'high' : p.value >= 40 ? 'medium' : 'low';
+              return `
+                <div class="prob-bar">
+                  <span class="prob-label">${p.label}</span>
+                  <div class="prob-track">
+                    <div class="prob-fill ${level}" style="width: ${p.value}%;"></div>
+                  </div>
+                  <span class="prob-value">${Math.round(p.value)}%</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      function renderWind(wind) {
+        if (!wind || (!wind.maxGust && !wind.maxSustained)) {
+          DOM.windContainer.innerHTML = `
+            <div style="text-align: center; padding: 16px; color: var(--text-muted);">
+              <div style="font-size: 32px; margin-bottom: 8px;">🍃</div>
+              <div style="font-size: 13px;">Light winds expected</div>
+            </div>
+          `;
+          return;
+        }
+
+        const gustLevel = wind.maxGust >= 50 ? 'high' : wind.maxGust >= 30 ? 'medium' : 'low';
+        const sustainedLevel = wind.maxSustained >= 30 ? 'high' : wind.maxSustained >= 20 ? 'medium' : 'low';
+
+        DOM.windContainer.innerHTML = `
+          <div style="display: flex; gap: 16px; justify-content: center; text-align: center;">
+            ${wind.maxSustained ? `
+              <div style="flex: 1; max-width: 120px;">
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Sustained</div>
+                <div style="font-size: 28px; font-weight: 600; font-family: var(--font-mono); color: var(--${sustainedLevel === 'high' ? 'alert-extreme' : sustainedLevel === 'medium' ? 'alert-moderate' : 'text-primary'});">${wind.maxSustained}</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">mph</div>
+              </div>
+            ` : ''}
+            ${wind.maxGust ? `
+              <div style="flex: 1; max-width: 120px;">
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Gusts up to</div>
+                <div style="font-size: 28px; font-weight: 600; font-family: var(--font-mono); color: var(--${gustLevel === 'high' ? 'alert-extreme' : gustLevel === 'medium' ? 'alert-moderate' : 'text-primary'});">${wind.maxGust}</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">mph</div>
+              </div>
+            ` : ''}
+          </div>
+          ${wind.hasSignificant ? `
+            <div style="margin-top: 12px; padding: 10px; background: rgba(234, 179, 8, 0.1); border-radius: 8px; text-align: center;">
+              <span style="font-size: 12px; color: var(--alert-moderate);">⚠️ Strong winds expected in next 24h</span>
+            </div>
+          ` : ''}
+        `;
+      }
+
+      function renderNews(articles, regionInfo) {
+        // Update region note to show search area
+        if (regionInfo?.searchArea) {
+          DOM.newsRegionNote.textContent = `Showing weather news for ${regionInfo.searchArea}`;
+          DOM.newsRegionNote.style.display = 'block';
+        } else {
+          DOM.newsRegionNote.style.display = 'none';
+        }
+
+        if (!articles || articles.length === 0) {
+          DOM.newsContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">No recent weather news for your area</p>`;
+          DOM.newsBadge.classList.add('hidden');
+          return;
+        }
+
+        DOM.newsBadge.textContent = articles.length;
+        DOM.newsBadge.classList.remove('hidden');
+
+        DOM.newsContainer.innerHTML = articles.map(article => {
+          const domain = article.domain || '';
+          const time = article.seendate ? formatNewsTime(article.seendate) : '';
+          
+          return `
+            <div class="news-item">
+              <a href="${escapeHtml(article.url)}" target="_blank" rel="noopener">
+                <div class="news-source">${escapeHtml(domain)}</div>
+                <div class="news-title">${escapeHtml(article.title)}</div>
+                ${time ? `<div class="news-time">${time}</div>` : ''}
+              </a>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // -----------------------------------------------------------------------
+      // Prepare Tab Rendering
+      // -----------------------------------------------------------------------
+      function renderTimeline(hourly, alerts, daily) {
+        const events = generateImpactTimeline(hourly, alerts, daily);
+        
+        if (!events || events.length === 0) {
+          DOM.timelineContainer.innerHTML = `
+            <div class="no-timeline">
+              <div style="font-size: 32px; margin-bottom: 8px;">✓</div>
+              No significant weather impacts expected in the next 24 hours
+            </div>
+          `;
+          return;
+        }
+
+        DOM.timelineContainer.innerHTML = events.map(event => `
+          <div class="timeline-event">
+            <div class="timeline-time">${event.time}</div>
+            <div class="timeline-dot ${event.severity}"></div>
+            <div class="timeline-content">
+              <div class="timeline-title">${escapeHtml(event.title)}</div>
+              <div class="timeline-desc">${escapeHtml(event.description)}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function generateImpactTimeline(hourly, alerts, daily) {
+        const events = [];
+        const now = new Date();
+        
+        // Check for active alerts and their timing
+        for (const alert of (alerts || [])) {
+          if (alert.effective && alert.ends) {
+            const start = new Date(alert.effective);
+            const end = new Date(alert.ends);
+            const event = alert.event || 'Weather Alert';
+            
+            // Alert start
+            if (start > now) {
+              events.push({
+                time: formatTimelineTime(start),
+                sortTime: start.getTime(),
+                title: `${event} begins`,
+                description: 'Conditions will start deteriorating',
+                severity: getSeverityClass(alert.severity),
+              });
+            } else {
+              events.push({
+                time: 'NOW',
+                sortTime: now.getTime(),
+                title: `${event} in effect`,
+                description: alert.headline || 'Active weather alert for your area',
+                severity: getSeverityClass(alert.severity),
+              });
+            }
+            
+            // Alert end / improving
+            if (end > now) {
+              events.push({
+                time: formatTimelineTime(end),
+                sortTime: end.getTime(),
+                title: 'Conditions improving',
+                description: `${event} expected to end`,
+                severity: 'improving',
+              });
+            }
+          }
+        }
+
+        // Analyze hourly forecast for significant changes
+        if (hourly && hourly.length > 0) {
+          let lastCondition = '';
+          let lastTemp = hourly[0]?.temperature;
+          
+          for (let i = 0; i < Math.min(hourly.length, 12); i++) {
+            const period = hourly[i];
+            const time = new Date(period.startTime);
+            const forecast = period.shortForecast?.toLowerCase() || '';
+            const temp = period.temperature;
+            const precip = period.probabilityOfPrecipitation?.value || 0;
+            
+            // Detect precipitation starting
+            if (precip >= 50 && !lastCondition.includes('rain') && !lastCondition.includes('snow')) {
+              const precipType = forecast.includes('snow') ? 'Snow' : 
+                                forecast.includes('rain') ? 'Rain' : 'Precipitation';
+              events.push({
+                time: formatTimelineTime(time),
+                sortTime: time.getTime(),
+                title: `${precipType} likely to begin`,
+                description: `${precip}% chance of precipitation`,
+                severity: 'warning',
+              });
+            }
+            
+            // Detect significant temperature drops
+            if (temp && lastTemp && (lastTemp - temp) >= 10) {
+              events.push({
+                time: formatTimelineTime(time),
+                sortTime: time.getTime(),
+                title: 'Temperature dropping',
+                description: `Expected to reach ${temp}°F`,
+                severity: 'warning',
+              });
+            }
+            
+            // Detect dangerous cold
+            if (temp !== null && temp <= 15 && (lastTemp === null || lastTemp > 15)) {
+              events.push({
+                time: formatTimelineTime(time),
+                sortTime: time.getTime(),
+                title: 'Dangerous cold arriving',
+                description: `Temperature dropping to ${temp}°F — limit outdoor exposure`,
+                severity: 'danger',
+              });
+            }
+            
+            // Detect clearing conditions
+            if (forecast.includes('clear') || forecast.includes('sunny')) {
+              if (lastCondition.includes('rain') || lastCondition.includes('snow') || lastCondition.includes('storm')) {
+                events.push({
+                  time: formatTimelineTime(time),
+                  sortTime: time.getTime(),
+                  title: 'Weather clearing',
+                  description: period.shortForecast,
+                  severity: 'improving',
+                });
+              }
+            }
+            
+            lastCondition = forecast;
+            lastTemp = temp;
+          }
+        }
+
+        // Sort by time and dedupe similar events
+        events.sort((a, b) => a.sortTime - b.sortTime);
+        
+        // Limit to most relevant events
+        return events.slice(0, 6);
+      }
+
+      function formatTimelineTime(date) {
+        const now = new Date();
+        const diffHours = (date - now) / (1000 * 60 * 60);
+        
+        if (diffHours < 1) return 'Soon';
+        if (diffHours < 24) {
+          return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        }
+        return date.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric' });
+      }
+
+      function getSeverityClass(severity) {
+        switch (severity?.toLowerCase()) {
+          case 'extreme': return 'danger';
+          case 'severe': return 'danger';
+          case 'moderate': return 'warning';
+          default: return 'normal';
+        }
+      }
+
+      function renderChecklist(alerts) {
+        const tasks = generateChecklist(alerts);
+        
+        if (!tasks || (tasks.urgent.length === 0 && tasks.soon.length === 0 && tasks.ready.length === 0)) {
+          DOM.checklistContainer.innerHTML = `
+            <div class="no-checklist">
+              <div style="font-size: 32px; margin-bottom: 8px;">😌</div>
+              No special preparation needed — conditions are normal
+            </div>
+          `;
+          DOM.prepareBadge.classList.add('hidden');
+          return;
+        }
+
+        // Show badge if there are urgent tasks
+        if (tasks.urgent.length > 0) {
+          DOM.prepareBadge.classList.remove('hidden');
+        } else {
+          DOM.prepareBadge.classList.add('hidden');
+        }
+
+        // Get completed tasks from localStorage
+        const completedKey = CONFIG.storage.prefix + 'checklist:completed';
+        let completed = [];
+        try {
+          completed = JSON.parse(localStorage.getItem(completedKey) || '[]');
+        } catch {}
+
+        let html = '';
+
+        if (tasks.urgent.length > 0) {
+          html += `
+            <div class="checklist-section">
+              <div class="checklist-priority urgent">⚠️ Do Now</div>
+              ${tasks.urgent.map((task, i) => renderChecklistItem(task, `urgent-${i}`, completed)).join('')}
+            </div>
+          `;
+        }
+
+        if (tasks.soon.length > 0) {
+          html += `
+            <div class="checklist-section">
+              <div class="checklist-priority soon">📋 Before Storm</div>
+              ${tasks.soon.map((task, i) => renderChecklistItem(task, `soon-${i}`, completed)).join('')}
+            </div>
+          `;
+        }
+
+        if (tasks.ready.length > 0) {
+          html += `
+            <div class="checklist-section">
+              <div class="checklist-priority ready">✓ Have Ready</div>
+              ${tasks.ready.map((task, i) => renderChecklistItem(task, `ready-${i}`, completed)).join('')}
+            </div>
+          `;
+        }
+
+        DOM.checklistContainer.innerHTML = html;
+
+        // Add click handlers
+        DOM.checklistContainer.querySelectorAll('.checklist-item').forEach(item => {
+          item.addEventListener('click', () => toggleChecklistItem(item, completedKey));
+        });
+      }
+
+      function renderChecklistItem(task, id, completed) {
+        const isCompleted = completed.includes(id);
+        return `
+          <div class="checklist-item ${isCompleted ? 'completed' : ''}" data-task-id="${id}">
+            <div class="checklist-checkbox">
+              ${isCompleted ? '✓' : ''}
+            </div>
+            <div class="checklist-text">${escapeHtml(task)}</div>
+          </div>
+        `;
+      }
+
+      function toggleChecklistItem(item, storageKey) {
+        const taskId = item.dataset.taskId;
+        let completed = [];
+        try {
+          completed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        } catch {}
+
+        if (item.classList.contains('completed')) {
+          // Uncomplete
+          completed = completed.filter(id => id !== taskId);
+          item.classList.remove('completed');
+          item.querySelector('.checklist-checkbox').textContent = '';
+        } else {
+          // Complete
+          completed.push(taskId);
+          item.classList.add('completed');
+          item.querySelector('.checklist-checkbox').textContent = '✓';
+        }
+
+        localStorage.setItem(storageKey, JSON.stringify(completed));
+      }
+
+      function generateChecklist(alerts) {
+        const tasks = { urgent: [], soon: [], ready: [] };
+        const seenTasks = new Set();
+
+        for (const alert of (alerts || [])) {
+          const event = alert.event || '';
+          let taskSet = PREPARATION_TASKS[event];
+          
+          if (!taskSet && PREPARATION_ALIASES[event]) {
+            taskSet = PREPARATION_TASKS[PREPARATION_ALIASES[event]];
+          }
+          
+          if (!taskSet) {
+            taskSet = PREPARATION_TASKS['default'];
+          }
+
+          // Add unique tasks
+          for (const task of (taskSet.urgent || [])) {
+            if (!seenTasks.has(task)) {
+              seenTasks.add(task);
+              tasks.urgent.push(task);
+            }
+          }
+          for (const task of (taskSet.soon || [])) {
+            if (!seenTasks.has(task)) {
+              seenTasks.add(task);
+              tasks.soon.push(task);
+            }
+          }
+          for (const task of (taskSet.ready || [])) {
+            if (!seenTasks.has(task)) {
+              seenTasks.add(task);
+              tasks.ready.push(task);
+            }
+          }
+        }
+
+        return tasks;
+      }
+
+      function renderSupplyCalculator(alerts) {
+        // Determine storm duration from alerts
+        let maxDuration = 0;
+        for (const alert of (alerts || [])) {
+          if (alert.effective && alert.ends) {
+            const duration = (new Date(alert.ends) - new Date(alert.effective)) / (1000 * 60 * 60);
+            maxDuration = Math.max(maxDuration, duration);
+          }
+        }
+
+        // Default to 3 days if no alerts or short duration
+        const days = Math.max(Math.ceil(maxDuration / 24), 3);
+        
+        // Store for recalculation
+        window.stormDays = days;
+        window.alertTypes = (alerts || []).map(a => a.event);
+
+        updateSupplyDisplay();
+      }
+
+      function updateSupplyDisplay() {
+        const people = parseInt(DOM.householdValue.textContent) || 2;
+        const days = window.stormDays || 3;
+        const alertTypes = window.alertTypes || [];
+
+        // Base calculations
+        const waterGallons = people * days;
+        const foodCalories = people * days * 2000;
+        const foodDays = days;
+        const batteries = Math.ceil(people * 2);
+
+        // Adjust based on alert type
+        let extras = [];
+        const alertStr = alertTypes.join(' ').toLowerCase();
+        
+        if (alertStr.includes('winter') || alertStr.includes('blizzard') || alertStr.includes('ice') || alertStr.includes('cold')) {
+          extras.push({ icon: '🧣', amount: people * 2, label: 'Warm blankets' });
+          extras.push({ icon: '🔥', amount: 'Yes', label: 'Alt. heat source' });
+        }
+        if (alertStr.includes('heat')) {
+          extras.push({ icon: '💧', amount: waterGallons * 1.5 + ' gal', label: 'Extra water' });
+          extras.push({ icon: '🧊', amount: people, label: 'Cooling towels' });
+        }
+        if (alertStr.includes('hurricane') || alertStr.includes('flood')) {
+          extras.push({ icon: '📄', amount: 'Yes', label: 'Documents bag' });
+          extras.push({ icon: '💵', amount: '$' + (people * 100), label: 'Cash on hand' });
+        }
+
+        DOM.supplyResults.innerHTML = `
+          <div class="supply-grid">
+            <div class="supply-item">
+              <div class="supply-icon">💧</div>
+              <div class="supply-amount">${waterGallons} gal</div>
+              <div class="supply-label">Water</div>
+            </div>
+            <div class="supply-item">
+              <div class="supply-icon">🥫</div>
+              <div class="supply-amount">${foodDays} days</div>
+              <div class="supply-label">Non-perishable</div>
+            </div>
+            <div class="supply-item">
+              <div class="supply-icon">🔋</div>
+              <div class="supply-amount">${batteries}+ packs</div>
+              <div class="supply-label">Batteries</div>
+            </div>
+            <div class="supply-item">
+              <div class="supply-icon">🔦</div>
+              <div class="supply-amount">${Math.ceil(people / 2)}</div>
+              <div class="supply-label">Flashlights</div>
+            </div>
+            ${extras.map(e => `
+              <div class="supply-item">
+                <div class="supply-icon">${e.icon}</div>
+                <div class="supply-amount">${e.amount}</div>
+                <div class="supply-label">${e.label}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="supply-note">
+            📌 Based on ${people} people for ${days} days. FEMA recommends minimum 3-day supply.
+          </div>
+        `;
+      }
+
+      function renderNwsOffice(office) {
+        if (office) {
+          DOM.nwsOfficeContact.style.display = 'flex';
+          DOM.nwsOfficeName.textContent = `NWS ${office} Forecast Office`;
+          DOM.nwsOfficeLink.href = `https://www.weather.gov/${office.toLowerCase()}/`;
+        } else {
+          DOM.nwsOfficeContact.style.display = 'none';
+        }
+      }
+
+      function renderPrepare(data) {
+        renderTimeline(data.hourly, data.alerts, data.daily);
+        renderChecklist(data.alerts);
+        renderSupplyCalculator(data.alerts);
+        renderNwsOffice(data.points?.office);
+      }
+
+      // -----------------------------------------------------------------------
+      // UI Helpers
+      // -----------------------------------------------------------------------
+      function getWeatherIcon(forecast, isDaytime, className = 'hourly-icon') {
+        const f = (forecast || '').toLowerCase();
+        let icon = '☀️';
+        
+        if (f.includes('snow') || f.includes('flurr')) icon = '❄️';
+        else if (f.includes('ice') || f.includes('freez')) icon = '🧊';
+        else if (f.includes('thunder') || f.includes('storm')) icon = '⛈️';
+        else if (f.includes('rain') || f.includes('shower')) icon = '🌧️';
+        else if (f.includes('drizzle')) icon = '🌦️';
+        else if (f.includes('fog') || f.includes('mist')) icon = '🌫️';
+        else if (f.includes('cloud') || f.includes('overcast')) icon = isDaytime ? '⛅' : '☁️';
+        else if (f.includes('partly')) icon = isDaytime ? '🌤️' : '☁️';
+        else if (f.includes('wind')) icon = '💨';
+        else if (f.includes('clear') || f.includes('sunny')) icon = isDaytime ? '☀️' : '🌙';
+        else icon = isDaytime ? '🌤️' : '🌙';
+
+        return `<div class="${className}">${icon}</div>`;
+      }
+
+      function formatDateTime(date) {
+        return date.toLocaleString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
+      }
+
+      function formatNewsTime(dateStr) {
+        try {
+          const d = new Date(
+            dateStr.substring(0, 4) + '-' +
+            dateStr.substring(4, 6) + '-' +
+            dateStr.substring(6, 8) + 'T' +
+            dateStr.substring(9, 11) + ':' +
+            dateStr.substring(11, 13) + ':00Z'
+          );
+          const now = new Date();
+          const diff = now - d;
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          
+          if (hours < 1) return 'Just now';
+          if (hours < 24) return `${hours}h ago`;
+          const days = Math.floor(hours / 24);
+          return `${days}d ago`;
+        } catch {
+          return '';
+        }
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function truncate(str, len) {
+        if (!str || str.length <= len) return str;
+        return str.substring(0, len).trim() + '...';
+      }
+
+      // -----------------------------------------------------------------------
+      // State Management
+      // -----------------------------------------------------------------------
+      function showState(stateName) {
+        DOM.emptyState.classList.add('hidden');
+        DOM.loadingState.classList.add('hidden');
+        DOM.errorState.classList.add('hidden');
+        DOM.currentCard.classList.add('hidden');
+        DOM.hourlyCard.classList.add('hidden');
+        DOM.alertsContainer.innerHTML = '';
+
+        switch (stateName) {
+          case 'empty':
+            DOM.emptyState.classList.remove('hidden');
+            break;
+          case 'loading':
+            DOM.loadingState.classList.remove('hidden');
+            break;
+          case 'error':
+            DOM.errorState.classList.remove('hidden');
+            break;
+          case 'data':
+            DOM.currentCard.classList.remove('hidden');
+            DOM.hourlyCard.classList.remove('hidden');
+            break;
+        }
+      }
+
+      function updateHeader(location, lastUpdate) {
+        if (location) {
+          DOM.locationDisplay.innerHTML = `${location.city}, ${location.state} <span class="zip">${location.zip}</span>`;
+          DOM.btnLocation.innerHTML = `
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            Change
+          `;
+        }
+        
+        if (lastUpdate) {
+          const time = new Date(lastUpdate);
+          DOM.updateTime.textContent = time.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // Main Load Function
+      // -----------------------------------------------------------------------
+      async function loadZip(zip) {
+        if (state.isLoading) return;
+        
+        state.isLoading = true;
+        state.error = null;
+        showState('loading');
+        DOM.btnRefresh.disabled = true;
+
+        try {
+          const data = await loadWeatherData(zip);
+          
+          state.zip = zip;
+          state.location = data.location;
+          state.data = data;
+          state.lastUpdate = Date.now();
+
+          localStorage.setItem(CONFIG.storage.zipKey, zip);
+
+          showState('data');
+          updateHeader(data.location, state.lastUpdate);
+          renderAlerts(data.alerts);
+          renderCurrent(data.current);
+          renderHourly(data.hourly);
+          renderDaily(data.daily);
+          renderNews(data.news, data.newsRegion);
+          renderAccumulation(data.accumulation);
+          renderProbability(data.probability);
+          renderWind(data.wind);
+          renderPrepare(data);
+
+          DOM.btnRefresh.disabled = false;
+
+        } catch (err) {
+          console.error('Load error:', err);
+          state.error = err.message;
+          showState('error');
+          DOM.errorMessage.textContent = err.message || 'Unable to load weather data';
+          DOM.btnRefresh.disabled = !state.zip;
+        } finally {
+          state.isLoading = false;
+        }
+      }
+
+      // -----------------------------------------------------------------------
+      // Event Handlers
+      // -----------------------------------------------------------------------
+      function openZipModal() {
+        DOM.zipModal.classList.add('active');
+        DOM.zipInput.value = state.zip || '';
+        setTimeout(() => DOM.zipInput.focus(), 100);
+      }
+
+      function closeZipModal() {
+        DOM.zipModal.classList.remove('active');
+        DOM.zipInput.blur();
+      }
+
+      function submitZip() {
+        const zip = DOM.zipInput.value.trim();
+        if (!/^\d{5}$/.test(zip)) {
+          DOM.zipInput.style.borderColor = 'var(--alert-extreme)';
+          setTimeout(() => DOM.zipInput.style.borderColor = '', 1000);
+          return;
+        }
+        closeZipModal();
+        loadZip(zip);
+      }
+
+      function handleRefresh() {
+        if (state.zip && !state.isLoading) {
+          const url1 = `${CONFIG.api.nws}alerts/active?point=${state.location.lat},${state.location.lon}`;
+          localStorage.removeItem(cacheKey(url1));
+          loadZip(state.zip);
+        }
+      }
+
+      function switchTab(tabName) {
+        DOM.tabs.forEach(tab => {
+          tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+        DOM.tabContents.forEach(content => {
+          content.classList.toggle('active', content.id === `tab-${tabName}`);
+        });
+      }
+
+      // Global functions for alert interactions
+      window.toggleAlertDetails = function(idx) {
+        const details = document.getElementById(`alert-details-${idx}`);
+        if (details) {
+          details.classList.toggle('expanded');
+          const btn = details.previousElementSibling;
+          if (btn) {
+            btn.textContent = details.classList.contains('expanded') 
+              ? 'Hide NWS details ▲' 
+              : 'Show full NWS details ▼';
+          }
+        }
+      };
+
+      window.toggleTips = function(idx) {
+        const panel = document.getElementById(`tips-panel-${idx}`);
+        if (panel) {
+          panel.classList.toggle('expanded');
+        }
+      };
+
+      // -----------------------------------------------------------------------
+      // Initialize
+      // -----------------------------------------------------------------------
+      function init() {
+        DOM.btnLocation.addEventListener('click', openZipModal);
+        DOM.btnRefresh.addEventListener('click', handleRefresh);
+        DOM.btnCancel.addEventListener('click', closeZipModal);
+        DOM.btnSubmitZip.addEventListener('click', submitZip);
+        
+        DOM.zipInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') submitZip();
+          if (e.key === 'Escape') closeZipModal();
+        });
+
+        DOM.zipModal.addEventListener('click', (e) => {
+          if (e.target === DOM.zipModal) closeZipModal();
+        });
+
+        DOM.tabs.forEach(tab => {
+          tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        });
+
+        // Household size stepper for supply calculator
+        DOM.btnHouseholdMinus.addEventListener('click', () => {
+          const current = parseInt(DOM.householdValue.textContent) || 2;
+          if (current > 1) {
+            DOM.householdValue.textContent = current - 1;
+            updateSupplyDisplay();
+          }
+        });
+
+        DOM.btnHouseholdPlus.addEventListener('click', () => {
+          const current = parseInt(DOM.householdValue.textContent) || 2;
+          if (current < 12) {
+            DOM.householdValue.textContent = current + 1;
+            updateSupplyDisplay();
+          }
+        });
+
+        const savedZip = localStorage.getItem(CONFIG.storage.zipKey);
+        if (savedZip && /^\d{5}$/.test(savedZip)) {
+          loadZip(savedZip);
+        } else {
+          showState('empty');
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>

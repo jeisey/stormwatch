@@ -2489,6 +2489,81 @@
         return data?.properties || null;
       }
 
+      // News filtering constants
+      const BLOCKED_DOMAINS = [
+        'yahoo.com',
+        'msn.com',
+        'flipboard.com',
+        'newsnow.co.uk',
+        'newsnow.com',
+        'ground.news',
+        'news.google.com',
+        'feedly.com',
+        'feedspot.com',
+        'biztoc.com',
+        'newsbreak.com',
+        'smartnews.com',
+        'apple.news',
+      ];
+
+      const WEATHER_KEYWORDS = [
+        'weather', 'storm', 'snow', 'rain', 'wind', 'tornado', 'hurricane',
+        'flood', 'ice', 'freeze', 'cold', 'heat', 'temperature', 'forecast',
+        'warning', 'watch', 'advisory', 'alert', 'emergency', 'evacuation',
+        'power outage', 'blizzard', 'hail', 'lightning', 'thunder', 'drought',
+      ];
+
+      // Quality thresholds
+      const MIN_TITLE_LENGTH = 20;
+      const MAX_CAPS_RATIO = 0.5;
+      const MAX_EXCLAMATION_MARKS = 2;
+
+      // Filter news articles for quality and relevance
+      function filterNews(articles) {
+        if (!articles || !Array.isArray(articles)) return [];
+        
+        return articles.filter(article => {
+          if (!article || !article.title || !article.url) return false;
+          
+          const title = article.title.toLowerCase();
+          
+          // 1. Domain blocklist check
+          try {
+            const hostname = new URL(article.url).hostname.toLowerCase();
+            const domain = hostname.replace('www.', '');
+            // Use exact match or subdomain match to avoid false positives
+            if (BLOCKED_DOMAINS.some(blocked => domain === blocked || domain.endsWith('.' + blocked))) {
+              return false;
+            }
+          } catch (e) {
+            // Invalid URL, skip it
+            return false;
+          }
+          
+          // 2. Title quality checks
+          // Too short (often spam)
+          if (article.title.length < MIN_TITLE_LENGTH) return false;
+          
+          // Excessive caps (clickbait indicator)
+          // Calculate ratio based on letters only, not punctuation/spaces
+          const letters = article.title.match(/[a-zA-Z]/g) || [];
+          const capsCount = (article.title.match(/[A-Z]/g) || []).length;
+          const capsRatio = letters.length > 0 ? capsCount / letters.length : 0;
+          if (capsRatio > MAX_CAPS_RATIO) return false;
+          
+          const exclamationCount = (article.title.match(/!/g) || []).length;
+          if (exclamationCount > MAX_EXCLAMATION_MARKS) return false;
+          
+          // 3. Weather keyword validation
+          const hasWeatherKeyword = WEATHER_KEYWORDS.some(keyword => 
+            title.includes(keyword.toLowerCase())
+          );
+          if (!hasWeatherKeyword) return false;
+          
+          return true;
+        });
+      }
+
       // Enhanced news fetch with regional coverage
       async function getGdeltNews(location, points) {
         // Strategy: Search by state for broad coverage, since small towns rarely appear in news
@@ -2519,6 +2594,9 @@
         // Fetch from primary query (state-level for best coverage)
         const primaryQuery = queries[0] || `storm weather "${location.city}"`;
         
+        // Add language and country filters to improve quality
+        const fullQuery = `${primaryQuery} sourcelang:english sourcecountry:US`;
+        
         const params = new URLSearchParams({
           mode: 'ArtList',
           format: 'json',
@@ -2527,7 +2605,7 @@
           timespan: '7d',
         });
         
-        const encodedQuery = encodeURIComponent(primaryQuery);
+        const encodedQuery = encodeURIComponent(fullQuery);
         const url = `${CONFIG.api.gdelt}?query=${encodedQuery}&${params}`;
         
         console.log('[GDELT] Query URL:', url);
@@ -2535,9 +2613,14 @@
         try {
           const data = await cachedFetch(url, CONFIG.cache.gdeltNews);
           console.log('[GDELT] Response:', data);
-          console.log('[GDELT] Articles count:', data?.articles?.length || 0);
+          console.log('[GDELT] Articles count (raw):', data?.articles?.length || 0);
+          
+          // Apply client-side filters
+          const filteredArticles = filterNews(data?.articles || []);
+          console.log('[GDELT] Articles count (after filtering):', filteredArticles.length);
+          
           return {
-            articles: data?.articles || [],
+            articles: filteredArticles,
             regionInfo: {
               searchArea: stateName || nearbyCity || location.city,
               nearbyCity: nearbyCity,
@@ -2839,10 +2922,42 @@
 
       function dedupeNews(articles) {
         const seen = new Set();
+        
+        // Helper function to normalize titles for comparison
+        function normalizeTitle(title) {
+          if (!title) return '';
+          return title
+            .toLowerCase()
+            .replace(/[^\w\s]/g, '') // Remove punctuation
+            .replace(/\s+/g, ' ')     // Normalize whitespace
+            .trim();
+        }
+        
         return articles.filter(article => {
-          const key = article.title?.toLowerCase().substring(0, 50);
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
+          if (!article?.title) return false;
+          
+          const normalized = normalizeTitle(article.title);
+          
+          // Check for exact duplicates first
+          if (seen.has(normalized)) return false;
+          
+          // Check for near-duplicates (articles with very similar titles)
+          for (const seenTitle of seen) {
+            // If one title is contained in another and they're both long enough
+            if (normalized.length > 30 && seenTitle.length > 30) {
+              if (normalized.includes(seenTitle) || seenTitle.includes(normalized)) {
+                return false;
+              }
+            }
+            
+            // Check similarity for shorter titles
+            // If first 60 chars match, consider it a duplicate
+            if (normalized.substring(0, 60) === seenTitle.substring(0, 60)) {
+              return false;
+            }
+          }
+          
+          seen.add(normalized);
           return true;
         }).slice(0, 15);
       }

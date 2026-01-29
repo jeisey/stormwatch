@@ -2513,6 +2513,11 @@
         'power outage', 'blizzard', 'hail', 'lightning', 'thunder', 'drought',
       ];
 
+      // Quality thresholds
+      const MIN_TITLE_LENGTH = 20;
+      const MAX_CAPS_RATIO = 0.5;
+      const MAX_EXCLAMATION_MARKS = 2;
+
       // Filter news articles for quality and relevance
       function filterNews(articles) {
         if (!articles || !Array.isArray(articles)) return [];
@@ -2521,13 +2526,13 @@
           if (!article || !article.title || !article.url) return false;
           
           const title = article.title.toLowerCase();
-          const url = article.url.toLowerCase();
           
           // 1. Domain blocklist check
           try {
             const hostname = new URL(article.url).hostname.toLowerCase();
             const domain = hostname.replace('www.', '');
-            if (BLOCKED_DOMAINS.some(blocked => domain.includes(blocked))) {
+            // Use exact match or subdomain match to avoid false positives
+            if (BLOCKED_DOMAINS.some(blocked => domain === blocked || domain.endsWith('.' + blocked))) {
               return false;
             }
           } catch (e) {
@@ -2537,15 +2542,17 @@
           
           // 2. Title quality checks
           // Too short (often spam)
-          if (article.title.length < 20) return false;
+          if (article.title.length < MIN_TITLE_LENGTH) return false;
           
-          // Excessive punctuation/caps (clickbait indicators)
+          // Excessive caps (clickbait indicator)
+          // Calculate ratio based on letters only, not punctuation/spaces
+          const letters = article.title.match(/[a-zA-Z]/g) || [];
           const capsCount = (article.title.match(/[A-Z]/g) || []).length;
-          const capsRatio = capsCount / article.title.length;
-          if (capsRatio > 0.5 && article.title.length > 10) return false; // More than 50% caps
+          const capsRatio = letters.length > 0 ? capsCount / letters.length : 0;
+          if (capsRatio > MAX_CAPS_RATIO) return false;
           
           const exclamationCount = (article.title.match(/!/g) || []).length;
-          if (exclamationCount > 2) return false; // Too many exclamation marks
+          if (exclamationCount > MAX_EXCLAMATION_MARKS) return false;
           
           // 3. Weather keyword validation
           const hasWeatherKeyword = WEATHER_KEYWORDS.some(keyword => 

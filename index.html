@@ -3076,12 +3076,14 @@
           const hour = time.getHours();
           const timeStr = hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`;
           const precip = period.probabilityOfPrecipitation?.value;
+          const temp = period.temperature ?? '—';
+          const tempDisplay = Number.isFinite(temp) ? `${temp}°` : '—';
           
           return `
             <div class="hourly-item">
               <div class="hourly-time">${timeStr}</div>
               ${getWeatherIcon(period.shortForecast, period.isDaytime)}
-              <div class="hourly-temp">${period.temperature}°</div>
+              <div class="hourly-temp">${tempDisplay}</div>
               ${precip && precip > 20 ? `<div class="hourly-precip">${precip}%</div>` : ''}
             </div>
           `;

@@ -3091,9 +3091,15 @@
       function renderDaily(days) {
         DOM.dailyContainer.innerHTML = days.map(day => `
           <div class="daily-item">
-            <div class="daily-day">${day.name.substring(0, 3)}</div>
-            ${getWeatherIcon(day.shortForecast, true, 'daily-icon')}
-            <div class="daily-desc">${escapeHtml(day.shortForecast)}</div>
+            ${(() => {
+              const label = day?.name ? day.name.substring(0, 3) : '—';
+              const shortForecast = day?.shortForecast ?? '—';
+              return `
+                <div class="daily-day">${label}</div>
+                ${getWeatherIcon(shortForecast, true, 'daily-icon')}
+                <div class="daily-desc">${escapeHtml(shortForecast)}</div>
+              `;
+            })()}
             <div class="daily-temps">
               <span class="daily-high">${day.high ?? '—'}°</span>
               <span class="daily-low">${day.low ?? '—'}°</span>

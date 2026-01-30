@@ -3273,14 +3273,30 @@
         DOM.newsContainer.innerHTML = articles.map(article => {
           const domain = article.domain || '';
           const time = article.seendate ? formatNewsTime(article.seendate) : '';
+          let safeUrl = null;
+
+          try {
+            const parsedUrl = new URL(article.url);
+            if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+              safeUrl = parsedUrl.toString();
+            }
+          } catch {
+            safeUrl = null;
+          }
+
+          const content = `
+            <div class="news-source">${escapeHtml(domain)}</div>
+            <div class="news-title">${escapeHtml(article.title)}</div>
+            ${time ? `<div class="news-time">${time}</div>` : ''}
+          `;
           
           return `
             <div class="news-item">
-              <a href="${escapeHtml(article.url)}" target="_blank" rel="noopener">
-                <div class="news-source">${escapeHtml(domain)}</div>
-                <div class="news-title">${escapeHtml(article.title)}</div>
-                ${time ? `<div class="news-time">${time}</div>` : ''}
-              </a>
+              ${
+                safeUrl
+                  ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">${content}</a>`
+                  : `<div class="news-item-content">${content}</div>`
+              }
             </div>
           `;
         }).join('');

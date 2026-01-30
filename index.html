@@ -671,6 +671,64 @@
       gap: 8px;
     }
 
+    .probability-timeline {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .timeline-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .timeline-bars {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 6px;
+      align-items: end;
+    }
+
+    .timeline-bar {
+      height: 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .timeline-fill {
+      width: 100%;
+      border-radius: 6px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      transition: height 0.2s ease;
+    }
+
+    .timeline-fill.low {
+      background: rgba(59, 130, 246, 0.2);
+    }
+
+    .timeline-fill.medium {
+      background: rgba(234, 179, 8, 0.25);
+      border-color: rgba(234, 179, 8, 0.5);
+    }
+
+    .timeline-fill.high {
+      background: rgba(220, 38, 38, 0.25);
+      border-color: rgba(220, 38, 38, 0.5);
+    }
+
+    .timeline-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+
     .prob-bar {
       display: flex;
       align-items: center;
@@ -2787,7 +2845,7 @@
       }
 
       function processProbabilityData(gridpoint, hourly) {
-        const probData = [];
+        const summary = [];
         const now = new Date();
 
         // Get probability of precipitation from gridpoint or hourly data
@@ -2803,7 +2861,7 @@
           }
 
           if (maxProb > 0) {
-            probData.push({ label: 'Next 24h', value: maxProb });
+            summary.push({ label: 'Next 24h', value: maxProb });
           }
         }
 
@@ -2815,12 +2873,22 @@
 
         if (precipProbs.length > 0) {
           const maxHourly = Math.max(...precipProbs);
-          if (maxHourly > 0 && !probData.find(p => p.label === 'Next 24h')) {
-            probData.push({ label: 'Next 12h', value: maxHourly });
+          if (maxHourly > 0 && !summary.find(p => p.label === 'Next 24h')) {
+            summary.push({ label: 'Next 12h', value: maxHourly });
           }
         }
 
-        return probData;
+        const timeline = next12h.map(period => {
+          const time = new Date(period.startTime);
+          const hour = time.getHours();
+          const label = hour === 0 ? '12a' : hour < 12 ? `${hour}a` : hour === 12 ? '12p' : `${hour - 12}p`;
+          return {
+            label,
+            value: period.probabilityOfPrecipitation?.value ?? 0,
+          };
+        });
+
+        return { summary, timeline };
       }
 
       function processWindData(gridpoint, hourly) {
@@ -3193,7 +3261,11 @@
       }
 
       function renderProbability(probability) {
-        if (!probability || probability.length === 0) {
+        const summary = probability?.summary || [];
+        const timeline = probability?.timeline || [];
+        const hasTimeline = timeline.some(item => item.value > 0);
+
+        if (summary.length === 0 && !hasTimeline) {
           DOM.probabilityContainer.innerHTML = `
             <div style="text-align: center; padding: 16px; color: var(--text-muted);">
               <div style="font-size: 32px; margin-bottom: 8px;">☀️</div>
@@ -3204,20 +3276,39 @@
         }
 
         DOM.probabilityContainer.innerHTML = `
-          <div class="probability-bars">
-            ${probability.map(p => {
-              const level = p.value >= 70 ? 'high' : p.value >= 40 ? 'medium' : 'low';
-              return `
-                <div class="prob-bar">
-                  <span class="prob-label">${p.label}</span>
-                  <div class="prob-track">
-                    <div class="prob-fill ${level}" style="width: ${p.value}%;"></div>
+          ${summary.length > 0 ? `
+            <div class="probability-bars">
+              ${summary.map(p => {
+                const level = p.value >= 70 ? 'high' : p.value >= 40 ? 'medium' : 'low';
+                return `
+                  <div class="prob-bar">
+                    <span class="prob-label">${p.label}</span>
+                    <div class="prob-track">
+                      <div class="prob-fill ${level}" style="width: ${p.value}%;"></div>
+                    </div>
+                    <span class="prob-value">${Math.round(p.value)}%</span>
                   </div>
-                  <span class="prob-value">${Math.round(p.value)}%</span>
-                </div>
-              `;
-            }).join('')}
-          </div>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+          ${timeline.length > 0 ? `
+            <div class="probability-timeline">
+              <div class="timeline-title">Next 12 Hours</div>
+              <div class="timeline-bars">
+                ${timeline.map(item => {
+                  const level = item.value >= 70 ? 'high' : item.value >= 40 ? 'medium' : 'low';
+                  const height = Math.max((item.value / 100) * 100, 4);
+                  return `
+                    <div class="timeline-bar">
+                      <div class="timeline-fill ${level}" style="height: ${height}%"></div>
+                      <div class="timeline-label">${item.label}</div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
         `;
       }
 

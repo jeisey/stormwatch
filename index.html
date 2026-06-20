@@ -13,6 +13,12 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Warm up the API origins early so the first data request skips DNS/TLS setup -->
+  <link rel="preconnect" href="https://api.weather.gov" crossorigin>
+  <link rel="dns-prefetch" href="https://api.weather.gov">
+  <link rel="preconnect" href="https://api.zippopotam.us" crossorigin>
+  <link rel="dns-prefetch" href="https://api.zippopotam.us">
+  <link rel="dns-prefetch" href="https://api.gdeltproject.org">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after {
@@ -547,6 +553,34 @@
       font-size: 10px;
       color: var(--accent);
       margin-top: 4px;
+    }
+
+    /* 12-hour temperature trend sparkline */
+    .hourly-trend {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .hourly-trend:empty {
+      display: none;
+    }
+
+    .hourly-trend svg {
+      width: 100%;
+      height: 56px;
+      display: block;
+      overflow: visible;
+    }
+
+    .hourly-trend .trend-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     /* Accumulation Chart */
@@ -1120,6 +1154,114 @@
       display: none !important;
     }
 
+    /* Skeleton loaders — shown while data streams in so the screen is never blank */
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton {
+      background: linear-gradient(
+        90deg,
+        var(--bg-card-hover) 25%,
+        rgba(255, 255, 255, 0.07) 37%,
+        var(--bg-card-hover) 63%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+      border-radius: 6px;
+      color: transparent !important;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .skeleton-line {
+      height: 12px;
+      width: 100%;
+      margin: 8px 0;
+    }
+
+    .skeleton-line.sm { width: 40%; height: 10px; }
+    .skeleton-line.lg { width: 70%; height: 18px; }
+
+    .hourly-item.skeleton {
+      width: 64px;
+      height: 96px;
+    }
+
+    .daily-item.skeleton {
+      height: 44px;
+      margin: 6px 0;
+    }
+
+    /* Subtle entrance for content as it appears */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .fade-in {
+      animation: fadeInUp 0.32s ease both;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in, .skeleton { animation: none; }
+      .skeleton { background: var(--bg-card-hover); }
+    }
+
+    /* Refresh button spins while a load is in flight */
+    .btn-secondary.loading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .btn-secondary.loading .btn-icon {
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* "Updating…" pill next to the timestamp */
+    .update-time .sync-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-right: 5px;
+      vertical-align: middle;
+      animation: pulse 1.1s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 1; }
+    }
+
+    /* Enhanced current-conditions header row (emoji + feels like) */
+    .current-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .current-emoji {
+      font-size: 46px;
+      line-height: 1;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+    }
+
+    .feels-like {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .feels-like strong {
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+
     /* Disclaimer - shown at bottom of scrollable content */
     .disclaimer {
       padding: 16px 20px;
@@ -1411,7 +1553,7 @@
     /* Responsive tweaks */
     @media (min-width: 480px) {
       .conditions-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
       }
       .tab {
         font-size: 13px;
@@ -1499,12 +1641,22 @@
             <h2>Current Conditions</h2>
           </div>
           <div class="card-body" id="currentBody">
-            <div class="current-temp">
-              <span class="temp-value" id="currentTemp">—</span>
-              <span class="temp-unit">°F</span>
+            <div class="current-main">
+              <div>
+                <div class="current-temp">
+                  <span class="temp-value" id="currentTemp">—</span>
+                  <span class="temp-unit">°F</span>
+                </div>
+                <div class="current-desc" id="currentDesc">—</div>
+                <div class="feels-like" id="currentFeels" style="display: none;">Feels like <strong></strong></div>
+              </div>
+              <div class="current-emoji" id="currentEmoji" aria-hidden="true"></div>
             </div>
-            <div class="current-desc" id="currentDesc">—</div>
             <div class="conditions-grid">
+              <div class="condition-item">
+                <div class="condition-label">Feels Like</div>
+                <div class="condition-value" id="currentFeelsGrid">—°</div>
+              </div>
               <div class="condition-item">
                 <div class="condition-label">Humidity</div>
                 <div class="condition-value" id="currentHumidity">—%</div>
@@ -1512,6 +1664,14 @@
               <div class="condition-item">
                 <div class="condition-label">Wind</div>
                 <div class="condition-value" id="currentWind">— mph</div>
+              </div>
+              <div class="condition-item">
+                <div class="condition-label">Dew Point</div>
+                <div class="condition-value" id="currentDewpoint">—°</div>
+              </div>
+              <div class="condition-item">
+                <div class="condition-label">Pressure</div>
+                <div class="condition-value" id="currentPressure">—</div>
               </div>
               <div class="condition-item">
                 <div class="condition-label">Visibility</div>
@@ -1531,6 +1691,7 @@
             <h2>Next 12 Hours</h2>
           </div>
           <div class="card-body">
+            <div class="hourly-trend" id="hourlyTrend"></div>
             <div class="hourly-scroll" id="hourlyScroll"></div>
           </div>
         </div>
@@ -2317,10 +2478,16 @@
         alertsContainer: $('#alertsContainer'),
         currentTemp: $('#currentTemp'),
         currentDesc: $('#currentDesc'),
+        currentEmoji: $('#currentEmoji'),
+        currentFeels: $('#currentFeels'),
+        currentFeelsGrid: $('#currentFeelsGrid'),
         currentHumidity: $('#currentHumidity'),
         currentWind: $('#currentWind'),
+        currentDewpoint: $('#currentDewpoint'),
+        currentPressure: $('#currentPressure'),
         currentVisibility: $('#currentVisibility'),
         hourlyScroll: $('#hourlyScroll'),
+        hourlyTrend: $('#hourlyTrend'),
         dailyContainer: $('#dailyContainer'),
         newsContainer: $('#newsContainer'),
         newsRegionNote: $('#newsRegionNote'),
@@ -2390,16 +2557,20 @@
         keys.slice(0, Math.floor(keys.length / 2)).forEach(k => localStorage.removeItem(k));
       }
 
-      async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+      async function fetchWithRetry(url, options = {}, maxRetries = 3, timeoutMs = 9000) {
         let attempt = 0;
-        
+
         // Add User-Agent for NWS API compliance
         const isNwsRequest = url.includes('api.weather.gov');
-        
+
         while (attempt < maxRetries) {
+          // Abort any single attempt that stalls so a hung socket can't freeze the UI
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeoutMs);
           try {
             const res = await fetch(url, {
               ...options,
+              signal: controller.signal,
               headers: {
                 'Accept': 'application/geo+json, application/json',
                 ...(isNwsRequest && { 'User-Agent': '(StormWatch, github.io)' }),
@@ -2423,22 +2594,53 @@
             if (attempt >= maxRetries - 1) throw err;
             await sleep(Math.pow(2, attempt) * 1000);
             attempt++;
+          } finally {
+            clearTimeout(timer);
           }
         }
       }
 
-      async function cachedFetch(url, ttl) {
+      async function cachedFetch(url, ttl, options = {}) {
+        const { maxRetries = 3, timeoutMs = 9000, allowStale = true } = options;
         const cached = readCache(url);
         const now = Date.now();
 
+        // Fresh cache hit — return immediately (this is what makes warm launches instant)
         if (cached && (now - cached.savedAt) < cached.ttl) {
           return cached.data;
         }
 
-        const res = await fetchWithRetry(url);
-        const data = await res.json();
-        writeCache(url, data, ttl);
-        return data;
+        try {
+          const res = await fetchWithRetry(url, {}, maxRetries, timeoutMs);
+          const data = await res.json();
+          writeCache(url, data, ttl);
+          return data;
+        } catch (err) {
+          // Network failed but we have an older copy — show stale data instead of an error
+          if (cached && allowStale) return cached.data;
+          throw err;
+        }
+      }
+
+      // Remove cache entries that are well past their useful life so localStorage
+      // doesn't bloat over weeks of use (a cause of the app slowing down over time).
+      function pruneExpiredCache() {
+        const prefix = CONFIG.storage.prefix + 'cache:';
+        const now = Date.now();
+        try {
+          Object.keys(localStorage).forEach((k) => {
+            if (!k.startsWith(prefix)) return;
+            try {
+              const v = JSON.parse(localStorage.getItem(k));
+              // Keep entries up to 4x their TTL as a stale fallback; drop older/corrupt ones
+              if (!v || !v.savedAt || (now - v.savedAt) > (v.ttl || 0) * 4) {
+                localStorage.removeItem(k);
+              }
+            } catch {
+              localStorage.removeItem(k);
+            }
+          });
+        } catch {}
       }
 
       // -----------------------------------------------------------------------
@@ -2448,6 +2650,7 @@
       const mpsToMph = (mps) => mps != null ? Math.round(mps * 2.237) : null;
       const metersToMiles = (m) => m != null ? (m / 1609.344).toFixed(1) : null;
       const mmToInches = (mm) => mm != null ? (mm / 25.4).toFixed(2) : null;
+      const paToInHg = (pa) => pa != null ? (pa * 0.00029530) : null;
 
       // -----------------------------------------------------------------------
       // API Functions
@@ -2669,7 +2872,7 @@
         console.log('[GDELT] Query URL:', url);
         
         try {
-          const data = await cachedFetch(url, CONFIG.cache.gdeltNews);
+          const data = await cachedFetch(url, CONFIG.cache.gdeltNews, { maxRetries: 2, timeoutMs: 12000 });
           console.log('[GDELT] Response:', data);
           console.log('[GDELT] Articles count (raw):', data?.articles?.length || 0);
           
@@ -2694,42 +2897,59 @@
       // -----------------------------------------------------------------------
       // Main Data Loader
       // -----------------------------------------------------------------------
-      async function loadWeatherData(zip) {
+      // Loads everything the user needs to act on RIGHT NOW (alerts, conditions,
+      // forecast, precip). The slow regional news feed is deliberately NOT awaited
+      // here so it can never delay the critical weather data — see loadNews().
+      async function loadCoreWeather(zip) {
         const location = await getGeoFromZip(zip);
         const points = await getNwsPoints(location.lat, location.lon);
 
-        // Fetch in parallel including gridpoint data
-        const [alerts, hourly, daily, stations, newsData, gridpoint] = await Promise.all([
+        // Fetch everything in parallel. The observation needs a station id, so we
+        // chain stations -> observation inside one slot rather than waiting for the
+        // whole batch first (saves a serial round trip).
+        const [alerts, hourly, daily, observation, gridpoint] = await Promise.all([
           getNwsAlerts(location.lat, location.lon),
           getNwsHourly(points.forecastHourlyUrl),
           getNwsDaily(points.forecastUrl),
-          getStationsList(points.stationsUrl),
-          getGdeltNews(location, points),
+          (async () => {
+            try {
+              const stations = await getStationsList(points.stationsUrl);
+              return await getLatestObservation(pickStationId(stations));
+            } catch {
+              return null;
+            }
+          })(),
           getNwsGridpoint(points.office, points.gridX, points.gridY),
         ]);
 
-        // Get current observation
-        let observation = null;
-        try {
-          const stationId = pickStationId(stations);
-          observation = await getLatestObservation(stationId);
-        } catch {}
-
         // Process current conditions
+        const feelsC = observation
+          ? (observation.heatIndex?.value ?? observation.windChill?.value ?? observation.temperature?.value)
+          : null;
         const current = observation ? {
           tempF: cToF(observation.temperature?.value),
-          description: observation.textDescription || '',
-          humidity: observation.relativeHumidity?.value != null 
-            ? Math.round(observation.relativeHumidity.value) 
+          feelsF: cToF(feelsC),
+          description: observation.textDescription || hourly[0]?.shortForecast || '',
+          isDaytime: hourly[0]?.isDaytime ?? true,
+          humidity: observation.relativeHumidity?.value != null
+            ? Math.round(observation.relativeHumidity.value)
             : null,
           windMph: mpsToMph(observation.windSpeed?.value),
+          windGustMph: mpsToMph(observation.windGust?.value),
           windDir: observation.windDirection?.value,
+          dewpointF: cToF(observation.dewpoint?.value),
+          pressureInHg: paToInHg(observation.barometricPressure?.value),
           visibilityMi: metersToMiles(observation.visibility?.value),
         } : {
           tempF: hourly[0]?.temperature,
+          feelsF: null,
           description: hourly[0]?.shortForecast || '',
+          isDaytime: hourly[0]?.isDaytime ?? true,
           humidity: null,
           windMph: null,
+          windGustMph: null,
+          dewpointF: null,
+          pressureInHg: null,
           visibilityMi: null,
         };
 
@@ -2745,11 +2965,19 @@
           current,
           hourly: hourly.slice(0, 12),
           daily: processDailyForecast(daily),
-          news: dedupeNews(newsData.articles),
-          newsRegion: newsData.regionInfo,
           accumulation,
           probability,
           wind,
+        };
+      }
+
+      // Regional news — fetched separately and lazily so it never blocks the
+      // critical weather data above.
+      async function loadNews(location, points) {
+        const newsData = await getGdeltNews(location, points);
+        return {
+          news: dedupeNews(newsData.articles),
+          newsRegion: newsData.regionInfo,
         };
       }
 
@@ -3131,14 +3359,45 @@
       }
 
       function renderCurrent(current) {
-        DOM.currentTemp.textContent = current.tempF != null ? current.tempF : '—';
-        DOM.currentDesc.textContent = current.description || '—';
-        DOM.currentHumidity.textContent = current.humidity != null ? `${current.humidity}%` : '—%';
-        DOM.currentWind.textContent = current.windMph != null ? `${current.windMph} mph` : '— mph';
-        DOM.currentVisibility.textContent = current.visibilityMi != null ? `${current.visibilityMi} mi` : '— mi';
+        const setVal = (el, val) => {
+          if (!el) return;
+          el.classList.remove('skeleton');
+          el.textContent = val;
+        };
+
+        setVal(DOM.currentTemp, current.tempF != null ? current.tempF : '—');
+        setVal(DOM.currentDesc, current.description || '—');
+        setVal(DOM.currentHumidity, current.humidity != null ? `${current.humidity}%` : '—%');
+
+        let windText = current.windMph != null ? `${current.windMph} mph` : '— mph';
+        if (current.windMph != null && current.windGustMph && current.windGustMph > current.windMph + 2) {
+          windText += ` G${current.windGustMph}`;
+        }
+        setVal(DOM.currentWind, windText);
+
+        setVal(DOM.currentVisibility, current.visibilityMi != null ? `${current.visibilityMi} mi` : '— mi');
+        setVal(DOM.currentDewpoint, current.dewpointF != null ? `${current.dewpointF}°` : '—°');
+        setVal(DOM.currentPressure, current.pressureInHg != null ? `${current.pressureInHg.toFixed(2)}"` : '—');
+        setVal(DOM.currentFeelsGrid, current.feelsF != null ? `${current.feelsF}°` : '—°');
+
+        if (DOM.currentEmoji) {
+          DOM.currentEmoji.textContent = getWeatherEmoji(current.description, current.isDaytime);
+        }
+
+        // Highlight "feels like" prominently only when it differs noticeably from the air temp
+        if (DOM.currentFeels) {
+          if (current.feelsF != null && current.tempF != null && Math.abs(current.feelsF - current.tempF) >= 2) {
+            DOM.currentFeels.style.display = '';
+            const strong = DOM.currentFeels.querySelector('strong');
+            if (strong) strong.textContent = `${current.feelsF}°`;
+          } else {
+            DOM.currentFeels.style.display = 'none';
+          }
+        }
       }
 
       function renderHourly(periods) {
+        renderHourlyTrend(periods);
         DOM.hourlyScroll.innerHTML = periods.map(period => {
           const time = new Date(period.startTime);
           const hour = time.getHours();
@@ -3156,6 +3415,52 @@
             </div>
           `;
         }).join('');
+      }
+
+      function renderHourlyTrend(periods) {
+        if (!DOM.hourlyTrend) return;
+
+        const pts = (periods || [])
+          .map(p => ({ t: Number(p.temperature) }))
+          .filter(p => Number.isFinite(p.t));
+
+        if (pts.length < 3) {
+          DOM.hourlyTrend.innerHTML = '';
+          return;
+        }
+
+        const temps = pts.map(p => p.t);
+        const min = Math.min(...temps);
+        const max = Math.max(...temps);
+        const range = Math.max(max - min, 1);
+        const W = 100, H = 30, pad = 5, n = pts.length;
+
+        const coords = pts.map((p, i) => {
+          const x = (i / (n - 1)) * W;
+          const y = pad + (1 - (p.t - min) / range) * (H - pad * 2);
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        });
+
+        const linePath = 'M' + coords.join(' L');
+        const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
+
+        DOM.hourlyTrend.innerHTML = `
+          <div class="trend-meta">
+            <span>12-hour trend</span>
+            <span>↑ ${Math.round(max)}° &nbsp; ↓ ${Math.round(min)}°</span>
+          </div>
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Temperature trend for the next 12 hours">
+            <defs>
+              <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.32"/>
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="${areaPath}" fill="url(#trendFill)"/>
+            <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="1.5"
+                  stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          </svg>
+        `;
       }
 
       function renderDaily(days) {
@@ -3807,23 +4112,23 @@
       // -----------------------------------------------------------------------
       // UI Helpers
       // -----------------------------------------------------------------------
-      function getWeatherIcon(forecast, isDaytime, className = 'hourly-icon') {
+      function getWeatherEmoji(forecast, isDaytime) {
         const f = (forecast || '').toLowerCase();
-        let icon = '☀️';
-        
-        if (f.includes('snow') || f.includes('flurr')) icon = '❄️';
-        else if (f.includes('ice') || f.includes('freez')) icon = '🧊';
-        else if (f.includes('thunder') || f.includes('storm')) icon = '⛈️';
-        else if (f.includes('rain') || f.includes('shower')) icon = '🌧️';
-        else if (f.includes('drizzle')) icon = '🌦️';
-        else if (f.includes('fog') || f.includes('mist')) icon = '🌫️';
-        else if (f.includes('cloud') || f.includes('overcast')) icon = isDaytime ? '⛅' : '☁️';
-        else if (f.includes('partly')) icon = isDaytime ? '🌤️' : '☁️';
-        else if (f.includes('wind')) icon = '💨';
-        else if (f.includes('clear') || f.includes('sunny')) icon = isDaytime ? '☀️' : '🌙';
-        else icon = isDaytime ? '🌤️' : '🌙';
+        if (f.includes('snow') || f.includes('flurr')) return '❄️';
+        if (f.includes('ice') || f.includes('freez')) return '🧊';
+        if (f.includes('thunder') || f.includes('storm')) return '⛈️';
+        if (f.includes('rain') || f.includes('shower')) return '🌧️';
+        if (f.includes('drizzle')) return '🌦️';
+        if (f.includes('fog') || f.includes('mist')) return '🌫️';
+        if (f.includes('cloud') || f.includes('overcast')) return isDaytime ? '⛅' : '☁️';
+        if (f.includes('partly')) return isDaytime ? '🌤️' : '☁️';
+        if (f.includes('wind')) return '💨';
+        if (f.includes('clear') || f.includes('sunny')) return isDaytime ? '☀️' : '🌙';
+        return isDaytime ? '🌤️' : '🌙';
+      }
 
-        return `<div class="${className}">${icon}</div>`;
+      function getWeatherIcon(forecast, isDaytime, className = 'hourly-icon') {
+        return `<div class="${className}">${getWeatherEmoji(forecast, isDaytime)}</div>`;
       }
 
       function formatDateTime(date) {
@@ -3898,9 +4203,9 @@
         }
       }
 
-      function updateHeader(location, lastUpdate) {
+      function updateHeader(location) {
         if (location) {
-          DOM.locationDisplay.innerHTML = `${location.city}, ${location.state} <span class="zip">${location.zip}</span>`;
+          DOM.locationDisplay.innerHTML = `${escapeHtml(location.city)}, ${escapeHtml(location.state)} <span class="zip">${escapeHtml(location.zip)}</span>`;
           DOM.btnLocation.innerHTML = `
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
@@ -3909,13 +4214,76 @@
             Change
           `;
         }
-        
-        if (lastUpdate) {
-          const time = new Date(lastUpdate);
+        renderUpdateTime();
+      }
+
+      function renderUpdateTime() {
+        if (state.lastUpdate) {
+          const time = new Date(state.lastUpdate);
           DOM.updateTime.textContent = time.toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit',
           });
+        } else {
+          DOM.updateTime.textContent = '—';
+        }
+      }
+
+      // Shows a pulsing "Updating…" hint in the header while a load is in flight
+      function setUpdating(on) {
+        if (on) {
+          DOM.updateTime.innerHTML = `<span class="sync-dot"></span>Updating…`;
+        } else {
+          renderUpdateTime();
+        }
+      }
+
+      // Skeleton placeholders so the very first load shows structure instantly
+      // instead of a blank screen.
+      function renderSkeletons() {
+        DOM.alertsContainer.innerHTML = `
+          <div class="card"><div class="card-body">
+            <div class="skeleton skeleton-line lg"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line sm"></div>
+          </div></div>`;
+
+        [DOM.currentTemp, DOM.currentDesc, DOM.currentFeelsGrid, DOM.currentHumidity,
+         DOM.currentWind, DOM.currentDewpoint, DOM.currentPressure, DOM.currentVisibility]
+          .forEach(el => el && el.classList.add('skeleton'));
+        if (DOM.currentEmoji) DOM.currentEmoji.textContent = '';
+        if (DOM.currentFeels) DOM.currentFeels.style.display = 'none';
+
+        if (DOM.hourlyTrend) DOM.hourlyTrend.innerHTML = '';
+        DOM.hourlyScroll.innerHTML = Array.from({ length: 8 })
+          .map(() => `<div class="hourly-item skeleton"></div>`).join('');
+        DOM.dailyContainer.innerHTML = Array.from({ length: 7 })
+          .map(() => `<div class="daily-item skeleton"></div>`).join('');
+      }
+
+      function renderNewsLoading() {
+        DOM.newsContainer.innerHTML = Array.from({ length: 3 }).map(() => `
+          <div class="news-item"><div class="news-item-content">
+            <div class="skeleton skeleton-line sm"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line" style="width:55%"></div>
+          </div></div>`).join('');
+      }
+
+      // Regional news loads after the critical data and never blocks it.
+      async function loadNewsSection(location, points) {
+        renderNewsLoading();
+        try {
+          const { news, newsRegion } = await loadNews(location, points);
+          if (state.data) {
+            state.data.news = news;
+            state.data.newsRegion = newsRegion;
+          }
+          renderNews(news, newsRegion);
+        } catch (err) {
+          console.error('News load error:', err);
+          DOM.newsContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">Weather news is unavailable right now.</p>`;
+          DOM.newsBadge.classList.add('hidden');
         }
       }
 
@@ -3924,15 +4292,24 @@
       // -----------------------------------------------------------------------
       async function loadZip(zip) {
         if (state.isLoading) return;
-        
+
         state.isLoading = true;
         state.error = null;
-        showState('loading');
         DOM.btnRefresh.disabled = true;
+        DOM.btnRefresh.classList.add('loading');
+
+        // First-ever load (no data on screen): show the layout with skeletons so the
+        // user immediately sees structure. On refresh we leave existing data visible.
+        if (!state.data) {
+          showState('data');
+          renderSkeletons();
+          renderNewsLoading();
+        }
+        setUpdating(true);
 
         try {
-          const data = await loadWeatherData(zip);
-          
+          const data = await loadCoreWeather(zip);
+
           state.zip = zip;
           state.location = data.location;
           state.data = data;
@@ -3940,13 +4317,13 @@
 
           localStorage.setItem(CONFIG.storage.zipKey, zip);
 
+          // Paint the critical weather data right away
           showState('data');
-          updateHeader(data.location, state.lastUpdate);
+          updateHeader(data.location);
           renderAlerts(data.alerts);
           renderCurrent(data.current);
           renderHourly(data.hourly);
           renderDaily(data.daily);
-          renderNews(data.news, data.newsRegion);
           renderAccumulation(data.accumulation);
           renderProbability(data.probability);
           renderWind(data.wind);
@@ -3954,14 +4331,22 @@
 
           DOM.btnRefresh.disabled = false;
 
+          // Lazy-load the slower regional news feed without blocking anything above
+          loadNewsSection(data.location, data.points);
+
         } catch (err) {
           console.error('Load error:', err);
           state.error = err.message;
-          showState('error');
-          DOM.errorMessage.textContent = err.message || 'Unable to load weather data';
+          // Only fall back to the full error screen when we have nothing to show
+          if (!state.data) {
+            showState('error');
+            DOM.errorMessage.textContent = err.message || 'Unable to load weather data';
+          }
           DOM.btnRefresh.disabled = !state.zip;
         } finally {
           state.isLoading = false;
+          DOM.btnRefresh.classList.remove('loading');
+          setUpdating(false);
         }
       }
 
@@ -3991,11 +4376,31 @@
       }
 
       function handleRefresh() {
-        if (state.zip && !state.isLoading) {
-          const url1 = `${CONFIG.api.nws}alerts/active?point=${state.location.lat},${state.location.lon}`;
-          localStorage.removeItem(cacheKey(url1));
-          loadZip(state.zip);
+        if (!state.zip || state.isLoading) return;
+
+        // Drop the short-lived caches for this location so refresh fetches fresh
+        // conditions/alerts/forecast instead of returning cached copies.
+        const loc = state.location;
+        const pts = state.data?.points;
+        const urls = [];
+        if (loc) urls.push(`${CONFIG.api.nws}alerts/active?point=${loc.lat},${loc.lon}`);
+        if (pts) {
+          urls.push(pts.forecastHourlyUrl, pts.forecastUrl);
+          urls.push(`${CONFIG.api.nws}gridpoints/${pts.office}/${pts.gridX},${pts.gridY}`);
         }
+        urls.forEach(u => u && localStorage.removeItem(cacheKey(u)));
+
+        // Latest-observation URLs include a station id, so clear them by pattern
+        const obsPrefix = CONFIG.storage.prefix + 'cache:' + CONFIG.api.nws + 'stations/';
+        try {
+          Object.keys(localStorage).forEach(k => {
+            if (k.startsWith(obsPrefix) && k.includes('/observations/latest')) {
+              localStorage.removeItem(k);
+            }
+          });
+        } catch {}
+
+        loadZip(state.zip);
       }
 
       function switchTab(tabName) {
@@ -4072,6 +4477,21 @@
           loadZip(savedZip);
         } else {
           showState('empty');
+        }
+
+        // Housekeeping that shouldn't compete with the first paint: trim stale cache
+        // entries so localStorage doesn't bloat (and slow the app) over time.
+        const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+        idle(() => pruneExpiredCache());
+
+        // Register the service worker so the app shell launches instantly from cache
+        // and keeps working offline. Stale-while-revalidate keeps it fresh.
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => {
+              console.warn('Service worker registration failed:', err);
+            });
+          });
         }
       }
 

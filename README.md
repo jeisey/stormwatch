@@ -7,8 +7,8 @@ A minimal, mobile-first weather emergency dashboard. Get real-time NWS alerts, f
 ### 📍 Vital Tab
 - **Emergency Alerts** — Active NWS warnings with severity badges (Extreme, Severe, Moderate, Minor)
 - **Safety Tips** — 50+ alert types mapped to actionable guidance
-- **Current Conditions** — Temperature, humidity, wind speed, visibility
-- **12-Hour Forecast** — Scrollable hourly forecast with precipitation probability
+- **Current Conditions** — Temperature with a matching weather glyph, "feels like" (heat index / wind chill), humidity, wind (with gusts), dew point, barometric pressure, and visibility
+- **12-Hour Forecast** — Scrollable hourly forecast with precipitation probability and a temperature-trend sparkline
 
 ### 📅 Forecast Tab
 - **7-Day Outlook** — Extended daily forecast with highs, lows, and conditions
@@ -34,6 +34,16 @@ A minimal, mobile-first weather emergency dashboard. Get real-time NWS alerts, f
 ### �📰 News Tab
 - **Regional Weather News** — Breaking weather news via GDELT
 - **State-Level Coverage** — Ensures suburban areas get relevant news
+
+## Performance & Offline
+
+StormWatch is built to feel instant, especially when installed to your home screen:
+
+- **Instant launch (service worker)** — The app shell is cached, so the installed app opens immediately and keeps working offline. The shell refreshes itself in the background (stale-while-revalidate).
+- **Progressive / lazy loading** — Critical data (alerts, current conditions, forecast, precipitation) renders as soon as it arrives. Slower regional news loads separately so it never blocks the weather you actually need.
+- **Skeleton loaders** — You see the layout shimmering into place instead of a blank screen.
+- **Resilient fetching** — Each request has a timeout (no more hanging on a stalled connection), and if the network fails the app falls back to the last cached copy rather than erroring out.
+- **Self-cleaning cache** — Expired entries are pruned on idle so local storage doesn't bloat and slow the app down over weeks of use.
 
 ## Screenshots
 
@@ -75,7 +85,7 @@ Once installed, the app will open in full-screen mode without browser navigation
 ## Deployment to GitHub Pages
 
 1. Create a new repository on GitHub
-2. Upload files: `index.html`, `manifest.json`
+2. Upload files: `index.html`, `manifest.json`, `sw.js`, and the icon PNGs
 3. Go to **Settings → Pages**
 4. Under "Source", select **Deploy from a branch**
 5. Select `main` branch and `/ (root)` folder
@@ -125,6 +135,7 @@ Safety tips are provided for 50+ NWS alert types:
 ### PWA Support
 - Add to Home Screen capable
 - Manifest file included
+- Service worker for instant launch and offline use
 - Mobile-optimized viewport
 
 ### API Compliance

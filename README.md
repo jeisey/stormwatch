@@ -18,6 +18,22 @@ A minimal, mobile-first weather emergency dashboard. Get real-time NWS alerts, f
 - **Snow & Ice Forecast** — Visual accumulation chart (only shown when relevant)
 - **Wind Forecast** — Max sustained winds and gusts with warnings for strong wind
 
+### 📡 Radar Tab *(NEW)*
+A full, dependency-free live weather radar — built from scratch on a `<canvas>`, no
+mapping library. Centered on your ZIP the moment you open it.
+- **Animated radar loop** — The last ~2 hours of radar plus a short-range forecast,
+  playing on a smooth, cross-faded timeline (RainViewer tiles)
+- **Rain Reaching You (nowcast)** — Samples radar intensity at your exact coordinates
+  across the forecast frames to estimate when precipitation will *arrive* or *clear*
+  — e.g. "Rain in ~20 min" or "Easing — likely to clear in ~30 min"
+- **Storm-warning polygons** — Active NWS Tornado / Severe Thunderstorm / Flash Flood
+  warnings drawn over the map in their real shapes, color-coded by severity
+- **Rain / Clouds layers** — Toggle between precipitation radar and infrared satellite
+- **Touch-native controls** — Drag to pan, pinch / wheel / double-tap to zoom,
+  one-tap recenter, scrubbable timeline with play/pause
+- **Battery-aware** — Only initializes when you open the tab, and pauses rendering
+  when the tab is hidden or the app is backgrounded
+
 ### �️ Prepare Tab *(NEW)*
 - **Impact Timeline** — Visual timeline showing when conditions will change
 - **Action Checklist** — Dynamic preparation tasks based on active alerts
@@ -102,6 +118,8 @@ Your site will be live at `https://[username].github.io/[repo-name]/`
 | Current Conditions | NWS API `/observations` | From nearest station |
 | Forecasts | NWS API `/forecast` | Hourly & daily |
 | Precipitation/Wind | NWS API `/gridpoints` | Raw gridpoint data |
+| Weather Radar | RainViewer Weather Maps v2 | Animated radar + IR satellite tiles |
+| Radar Base Map | CARTO dark basemap (OpenStreetMap data) | Map tiles for the radar view |
 | Weather News | GDELT DOC 2.0 | State-level search |
 
 ## Caching Strategy

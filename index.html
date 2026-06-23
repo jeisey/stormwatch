@@ -142,15 +142,18 @@
 
     .tab {
       flex: 1;
-      padding: 12px 8px;
+      min-width: 0;
+      padding: 12px 4px;
       background: none;
       border: none;
       color: var(--text-muted);
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: clamp(10.5px, 2.9vw, 12px);
       font-weight: 500;
       cursor: pointer;
       position: relative;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
       transition: color 0.2s;
     }
 
@@ -1562,6 +1565,349 @@
         grid-template-columns: repeat(4, 1fr);
       }
     }
+    /* ===================================================================== */
+    /* Live Radar tab                                                        */
+    /* ===================================================================== */
+    #tab-radar { display: none; }
+    #tab-radar.active { display: block; }
+
+    .radar-stage {
+      position: relative;
+      width: 100%;
+      height: calc(100dvh - 252px);
+      min-height: 320px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background:
+        radial-gradient(120% 120% at 50% 0%, #11131c 0%, #0a0a0f 70%);
+      touch-action: none;          /* we handle pan/zoom ourselves */
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: grab;
+    }
+    .radar-stage.dragging { cursor: grabbing; }
+
+    .radar-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Layer segmented control (top-left) */
+    .radar-segment {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 3;
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 999px;
+      background: rgba(10, 10, 15, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+    }
+    .seg-btn {
+      border: none;
+      background: none;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+    }
+    .seg-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    /* Zoom / recenter controls (right) */
+    .radar-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .radar-ctl {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(10, 10, 15, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--text-primary);
+      font-size: 22px;
+      font-weight: 400;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .radar-ctl:active { transform: scale(0.92); }
+    .radar-ctl:hover { background: rgba(34, 34, 46, 0.85); }
+    .radar-ctl svg { width: 18px; height: 18px; }
+
+    /* Live status pill (bottom-left, above transport) */
+    .radar-status {
+      position: absolute;
+      left: 12px;
+      bottom: 64px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(10, 10, 15, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      max-width: 60%;
+    }
+    .radar-live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--alert-minor);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+      animation: radarLivePulse 2s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes radarLivePulse {
+      0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+      70%  { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    /* Intensity legend (bottom-right, above transport) */
+    .radar-legend {
+      position: absolute;
+      right: 12px;
+      bottom: 64px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(10, 10, 15, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+    .radar-legend .legend-grad {
+      width: 56px;
+      height: 7px;
+      border-radius: 4px;
+      background: linear-gradient(90deg,
+        #1fa548 0%, #88d84f 28%, #f7e733 50%, #f59a1e 70%, #e0322a 88%, #b21fb2 100%);
+    }
+    .radar-legend.satellite .legend-grad {
+      background: linear-gradient(90deg, #20242e 0%, #4a5263 45%, #9aa4b8 75%, #ffffff 100%);
+    }
+
+    /* Transport / scrubber (bottom) */
+    .radar-transport {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: linear-gradient(0deg, rgba(8, 8, 12, 0.92) 0%, rgba(8, 8, 12, 0.55) 70%, transparent 100%);
+    }
+    .radar-play {
+      flex-shrink: 0;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 10px var(--accent-glow);
+      transition: transform 0.1s;
+    }
+    .radar-play:active { transform: scale(0.92); }
+    .radar-play svg { width: 20px; height: 20px; }
+
+    .radar-timeline {
+      position: relative;
+      flex: 1;
+      height: 28px;
+      cursor: pointer;
+      touch-action: none;
+    }
+    .radar-track {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      transform: translateY(-50%);
+      height: 4px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.14);
+      overflow: hidden;
+    }
+    /* the "now" divider between past frames and forecast frames */
+    .radar-track::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      left: var(--now-pos, 100%);
+      width: 2px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .radar-track .fill-future {
+      position: absolute;
+      top: 0; bottom: 0;
+      left: var(--now-pos, 100%);
+      right: 0;
+      background: repeating-linear-gradient(90deg,
+        rgba(59,130,246,0.45) 0, rgba(59,130,246,0.45) 4px,
+        rgba(59,130,246,0.15) 4px, rgba(59,130,246,0.15) 8px);
+    }
+    .radar-scrub {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 14px; height: 14px;
+      margin-left: -7px;
+      border-radius: 50%;
+      background: #fff;
+      transform: translateY(-50%);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      transition: left 0.18s linear;
+      pointer-events: none;
+    }
+    .radar-frametime {
+      flex-shrink: 0;
+      min-width: 70px;
+      text-align: right;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+    .radar-frametime .ft-rel { display: block; font-size: 9px; color: var(--text-muted); }
+
+    /* Overlay message (offline, errors, no location) */
+    .radar-overlay-msg {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      padding: 24px;
+      background: rgba(10, 10, 15, 0.82);
+      backdrop-filter: blur(2px);
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .radar-overlay-msg .om-title { color: var(--text-primary); font-weight: 600; font-size: 15px; }
+    .radar-overlay-msg button {
+      margin-top: 4px;
+      padding: 8px 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Nowcast banner */
+    .nowcast {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      position: relative;
+      overflow: hidden;
+    }
+    .nowcast[hidden], .radar-overlay-msg[hidden] { display: none; }
+    .nowcast.is-active { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.10); }
+    .nowcast.is-imminent { border-color: rgba(234,88,12,0.55); background: rgba(234,88,12,0.12); }
+    .nowcast.is-clear { border-color: var(--border); }
+    .nowcast-pulse {
+      flex-shrink: 0;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .nowcast.is-active .nowcast-pulse,
+    .nowcast.is-imminent .nowcast-pulse {
+      background: var(--accent);
+      animation: radarLivePulse 1.8s infinite;
+    }
+    .nowcast.is-imminent .nowcast-pulse { background: var(--alert-severe); }
+    .nowcast-text { flex: 1; min-width: 0; }
+    .nowcast-head {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .nowcast-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .nowcast-spark {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 30px;
+    }
+    .nowcast-spark .nb {
+      width: 5px;
+      border-radius: 2px 2px 0 0;
+      background: var(--accent);
+      opacity: 0.85;
+      min-height: 3px;
+      transition: height 0.3s;
+    }
+    .nowcast-spark .nb.future { opacity: 0.45; }
+
+    .radar-attribution {
+      margin-top: 10px;
+      font-size: 10.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .radar-attribution span { color: var(--text-secondary); }
   </style>
 </head>
 <body>
@@ -1587,6 +1933,7 @@
       <button class="tab active" data-tab="vital">Vital</button>
       <button class="tab" data-tab="forecast">Forecast</button>
       <button class="tab" data-tab="accumulation">Precip<span class="badge accent hidden" id="accumBadge"></span></button>
+      <button class="tab" data-tab="radar">Radar<span class="badge accent hidden" id="radarBadge"></span></button>
       <button class="tab" data-tab="prepare">Prepare<span class="badge accent hidden" id="prepareBadge"></span></button>
       <button class="tab" data-tab="news">News<span class="badge count hidden" id="newsBadge">0</span></button>
     </nav>
@@ -1761,6 +2108,71 @@
             <div class="no-accumulation">No significant wind expected</div>
           </div>
         </div>
+      </div>
+
+      <!-- Radar Tab -->
+      <div class="tab-content" id="tab-radar">
+        <!-- Nowcast banner: "rain reaching you" -->
+        <div class="nowcast" id="nowcastBanner" hidden>
+          <div class="nowcast-pulse" id="nowcastPulse"></div>
+          <div class="nowcast-text">
+            <div class="nowcast-head" id="nowcastHead">Checking radar…</div>
+            <div class="nowcast-sub" id="nowcastSub"></div>
+          </div>
+          <div class="nowcast-spark" id="nowcastSpark" aria-hidden="true"></div>
+        </div>
+
+        <!-- The map -->
+        <div class="radar-stage" id="radarStage">
+          <canvas class="radar-canvas" id="radarCanvas"></canvas>
+
+          <!-- Layer toggle -->
+          <div class="radar-segment" id="radarLayerToggle">
+            <button class="seg-btn active" data-layer="radar" id="segRadar">Rain</button>
+            <button class="seg-btn" data-layer="satellite" id="segSatellite">Clouds</button>
+          </div>
+
+          <!-- Right-side controls -->
+          <div class="radar-controls">
+            <button class="radar-ctl" id="radarZoomIn" aria-label="Zoom in">+</button>
+            <button class="radar-ctl" id="radarZoomOut" aria-label="Zoom out">−</button>
+            <button class="radar-ctl" id="radarRecenter" aria-label="Recenter on my location" title="Recenter">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+            </button>
+          </div>
+
+          <!-- Live status pill -->
+          <div class="radar-status" id="radarStatus"><span class="radar-live-dot"></span><span id="radarStatusText">Loading radar…</span></div>
+
+          <!-- Intensity legend -->
+          <div class="radar-legend" id="radarLegend">
+            <span class="legend-cap">Light</span>
+            <span class="legend-grad"></span>
+            <span class="legend-cap">Heavy</span>
+          </div>
+
+          <!-- Overlay message (offline / errors / no location) -->
+          <div class="radar-overlay-msg" id="radarOverlayMsg" hidden></div>
+
+          <!-- Transport / timeline -->
+          <div class="radar-transport" id="radarTransport">
+            <button class="radar-play" id="radarPlay" aria-label="Play or pause">
+              <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+              <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" hidden><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="radar-timeline" id="radarTimeline">
+              <div class="radar-track" id="radarTrack"><div class="fill-future"></div></div>
+              <div class="radar-scrub" id="radarScrub"></div>
+            </div>
+            <div class="radar-frametime" id="radarFrameTime">—</div>
+          </div>
+        </div>
+
+        <p class="radar-attribution">
+          Radar &amp; satellite by <span>RainViewer</span> · Base map ©
+          <span>OpenStreetMap</span> &amp; <span>CARTO</span>. Animated loop covers the
+          last ~2 hours plus a short-range forecast. Always defer to official warnings.
+        </p>
       </div>
 
       <!-- News Tab -->
@@ -2517,6 +2929,26 @@
         tabContents: $$('.tab-content'),
         currentCard: $('#currentCard'),
         hourlyCard: $('#hourlyCard'),
+        // Radar tab
+        radarBadge: $('#radarBadge'),
+        radarStage: $('#radarStage'),
+        radarCanvas: $('#radarCanvas'),
+        radarLayerToggle: $('#radarLayerToggle'),
+        radarControls: { in: $('#radarZoomIn'), out: $('#radarZoomOut'), recenter: $('#radarRecenter') },
+        radarStatus: $('#radarStatus'),
+        radarStatusText: $('#radarStatusText'),
+        radarLegend: $('#radarLegend'),
+        radarOverlayMsg: $('#radarOverlayMsg'),
+        radarTransport: $('#radarTransport'),
+        radarPlay: $('#radarPlay'),
+        radarTimeline: $('#radarTimeline'),
+        radarTrack: $('#radarTrack'),
+        radarScrub: $('#radarScrub'),
+        radarFrameTime: $('#radarFrameTime'),
+        nowcastBanner: $('#nowcastBanner'),
+        nowcastHead: $('#nowcastHead'),
+        nowcastSub: $('#nowcastSub'),
+        nowcastSpark: $('#nowcastSpark'),
       };
 
       // -----------------------------------------------------------------------
@@ -2710,6 +3142,22 @@
         const url = `${CONFIG.api.nws}alerts/active?point=${lat},${lon}`;
         const data = await cachedFetch(url, CONFIG.cache.nwsAlerts);
         return (data?.features || []).map(f => f.properties).filter(Boolean);
+      }
+
+      // Like getNwsAlerts, but keeps the GeoJSON geometry so the radar map can draw
+      // storm-based warning polygons (tornado / severe thunderstorm / flash flood).
+      // Reuses the same cache entry as getNwsAlerts, so it costs no extra network.
+      async function getNwsAlertGeo(lat, lon) {
+        const url = `${CONFIG.api.nws}alerts/active?point=${lat},${lon}`;
+        try {
+          const data = await cachedFetch(url, CONFIG.cache.nwsAlerts);
+          return (data?.features || [])
+            .filter(f => f && f.geometry &&
+              (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'))
+            .map(f => ({ geometry: f.geometry, properties: f.properties || {} }));
+        } catch {
+          return [];
+        }
       }
 
       async function getNwsHourly(url) {
@@ -2907,8 +3355,9 @@
         // Fetch everything in parallel. The observation needs a station id, so we
         // chain stations -> observation inside one slot rather than waiting for the
         // whole batch first (saves a serial round trip).
-        const [alerts, hourly, daily, observation, gridpoint] = await Promise.all([
+        const [alerts, alertGeo, hourly, daily, observation, gridpoint] = await Promise.all([
           getNwsAlerts(location.lat, location.lon),
+          getNwsAlertGeo(location.lat, location.lon),
           getNwsHourly(points.forecastHourlyUrl),
           getNwsDaily(points.forecastUrl),
           (async () => {
@@ -2962,6 +3411,7 @@
           location,
           points,
           alerts: sortAlerts(alerts),
+          alertGeo,
           current,
           hourly: hourly.slice(0, 12),
           daily: processDailyForecast(daily),
@@ -4328,6 +4778,7 @@
           renderProbability(data.probability);
           renderWind(data.wind);
           renderPrepare(data);
+          RadarMap.setLocation(data.location, data.alertGeo);
 
           DOM.btnRefresh.disabled = false;
 
@@ -4403,6 +4854,605 @@
         loadZip(state.zip);
       }
 
+      // -----------------------------------------------------------------------
+      // Live Radar — a dependency-free, canvas-based animated weather radar with
+      // pan/zoom, RainViewer radar + satellite loops, NWS storm-warning polygons,
+      // and a precipitation "nowcast" that samples radar intensity at the user's
+      // exact coordinates to estimate when rain will reach (or clear) them.
+      // -----------------------------------------------------------------------
+      const RadarMap = (function () {
+        const TILE = 256;
+        const MIN_Z = 4, MAX_Z = 11, DEFAULT_Z = 7;
+        const SAMPLE_Z = 8;          // zoom used for nowcast pixel sampling
+        const STEP_MS = 600;         // ms per frame during playback
+        const HOLD_LAST_MS = 1200;   // linger on the final forecast frame
+        const FADE_MS = 220;         // crossfade between frames
+        const RADAR_ALPHA = 0.82, SAT_ALPHA = 0.62;
+        const INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
+        const SEV_COLORS = {
+          extreme:  ['#dc2626', 'rgba(220,38,38,0.22)'],
+          severe:   ['#ea580c', 'rgba(234,88,12,0.20)'],
+          moderate: ['#eab308', 'rgba(234,179,8,0.16)'],
+          minor:    ['#22c55e', 'rgba(34,197,94,0.14)'],
+          unknown:  ['#8a8a9a', 'rgba(138,138,154,0.14)'],
+        };
+
+        let canvas, ctx, dpr = 1, stageW = 0, stageH = 0;
+        let view = { lat: 39.5, lon: -98.35, zoom: DEFAULT_Z };
+        const tiles = new Map();     // url -> { img, ok, err }
+        const tileOrder = [];        // insertion order for LRU pruning
+        let host = '';
+        let radarFrames = [], satFrames = [];
+        let layer = 'radar';
+        let frameIdx = 0, prevIdx = null, fadeStart = 0, lastStep = 0, playing = true;
+        let tabOpen = false, active = false, rafId = null;
+        let initialized = false, indexLoading = false, bound = false;
+        let userLoc = null, alertPolys = [];
+        let resizeObs = null, scrubbing = false, nowcastToken = 0;
+        let sampleCanvasEl = null;
+
+        // --- Web Mercator helpers (pixel space, 256px tiles) -----------------
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const clampLat = (l) => clamp(l, -85, 85);
+        const lon2x = (lon, z) => (lon + 180) / 360 * TILE * Math.pow(2, z);
+        const lat2y = (lat, z) => {
+          const s = Math.sin(lat * Math.PI / 180);
+          return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE * Math.pow(2, z);
+        };
+        const x2lon = (x, z) => x / (TILE * Math.pow(2, z)) * 360 - 180;
+        const y2lat = (y, z) => {
+          const n = Math.PI - 2 * Math.PI * y / (TILE * Math.pow(2, z));
+          return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+        };
+
+        function geom() {
+          const z = view.zoom;
+          const tz = clamp(Math.round(z), MIN_Z, MAX_Z);
+          const scale = Math.pow(2, z - tz);
+          const cx = lon2x(view.lon, tz), cy = lat2y(clampLat(view.lat), tz);
+          return { tz, scale, originX: cx - (stageW / 2) / scale, originY: cy - (stageH / 2) / scale };
+        }
+        function project(lat, lon, g) {
+          return {
+            x: (lon2x(lon, g.tz) - g.originX) * g.scale,
+            y: (lat2y(clampLat(lat), g.tz) - g.originY) * g.scale,
+          };
+        }
+        function unproject(px, py, g) {
+          return {
+            lon: x2lon(g.originX + px / g.scale, g.tz),
+            lat: y2lat(g.originY + py / g.scale, g.tz),
+          };
+        }
+
+        // --- Tile loading with an LRU cache ----------------------------------
+        function tile(url) {
+          let e = tiles.get(url);
+          if (e) return e;
+          e = { img: new Image(), ok: false, err: false };
+          e.img.crossOrigin = 'anonymous';
+          e.img.decoding = 'async';
+          e.img.onload = () => { e.ok = true; startLoop(); };
+          e.img.onerror = () => { e.err = true; };
+          e.img.src = url;
+          tiles.set(url, e);
+          tileOrder.push(url);
+          if (tileOrder.length > 600) {
+            const old = tileOrder.shift();
+            if (old !== url) tiles.delete(old);
+          }
+          return e;
+        }
+        function wrapX(x, z) { const n = Math.pow(2, z); return ((x % n) + n) % n; }
+        function inY(y, z) { return y >= 0 && y < Math.pow(2, z); }
+        function baseUrl(z, x, y) {
+          if (!inY(y, z)) return null;
+          const wx = wrapX(x, z), s = ['a', 'b', 'c'][(wx + y) % 3];
+          return `https://${s}.basemaps.cartocdn.com/dark_all/${z}/${wx}/${y}${dpr > 1 ? '@2x' : ''}.png`;
+        }
+        function frameUrl(frame, z, x, y) {
+          if (!inY(y, z) || !host) return null;
+          const wx = wrapX(x, z);
+          return layer === 'satellite'
+            ? `${host}${frame.path}/256/${z}/${wx}/${y}/0/0_0.png`
+            : `${host}${frame.path}/256/${z}/${wx}/${y}/4/1_1.png`;
+        }
+
+        function currentFrames() { return layer === 'satellite' ? satFrames : radarFrames; }
+        function nowIndex() {
+          const list = currentFrames();
+          let idx = 0;
+          for (let i = 0; i < list.length; i++) if (list[i].kind === 'past') idx = i;
+          return idx;
+        }
+
+        // --- Rendering -------------------------------------------------------
+        function drawTiles(g, urlFor, alpha) {
+          const { tz, scale, originX, originY } = g;
+          const x0 = Math.floor(originX / TILE), y0 = Math.floor(originY / TILE);
+          const x1 = Math.floor((originX + stageW / scale) / TILE);
+          const y1 = Math.floor((originY + stageH / scale) / TILE);
+          const ds = TILE * scale;
+          ctx.globalAlpha = alpha;
+          for (let ty = y0; ty <= y1; ty++) {
+            for (let tx = x0; tx <= x1; tx++) {
+              const url = urlFor(tz, tx, ty);
+              if (!url) continue;
+              const e = tile(url);
+              if (!e.ok) continue;
+              const dx = (tx * TILE - originX) * scale;
+              const dy = (ty * TILE - originY) * scale;
+              ctx.drawImage(e.img, dx, dy, ds + 1, ds + 1);
+            }
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        function drawWeatherFrames(g) {
+          const list = currentFrames();
+          if (!list.length) return;
+          const baseA = layer === 'satellite' ? SAT_ALPHA : RADAR_ALPHA;
+          let mix = 1;
+          if (prevIdx != null && prevIdx !== frameIdx) {
+            mix = clamp((performance.now() - fadeStart) / FADE_MS, 0, 1);
+          }
+          if (mix < 1 && list[prevIdx]) {
+            const pf = list[prevIdx];
+            drawTiles(g, (z, x, y) => frameUrl(pf, z, x, y), baseA * (1 - mix));
+          }
+          const cf = list[frameIdx];
+          if (cf) drawTiles(g, (z, x, y) => frameUrl(cf, z, x, y), baseA * mix);
+        }
+
+        function drawGeometry(geometry, g, stroke, fill) {
+          const multi = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+          for (const poly of multi) {
+            ctx.beginPath();
+            for (const ring of poly) {
+              ring.forEach((pt, i) => {
+                const p = project(pt[1], pt[0], g);
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+              });
+              ctx.closePath();
+            }
+            ctx.fillStyle = fill; ctx.fill('evenodd');
+            ctx.lineWidth = 2.5; ctx.strokeStyle = stroke; ctx.stroke();
+          }
+        }
+        function drawAlertPolys(g) {
+          for (const a of alertPolys) {
+            const sev = (a.properties.severity || 'unknown').toLowerCase();
+            const [stroke, fill] = SEV_COLORS[sev] || SEV_COLORS.unknown;
+            drawGeometry(a.geometry, g, stroke, fill);
+          }
+        }
+
+        function drawUserMarker(g) {
+          if (!userLoc) return;
+          const p = project(userLoc.lat, userLoc.lon, g);
+          if (p.x < -30 || p.x > stageW + 30 || p.y < -30 || p.y > stageH + 30) return;
+          const t = (performance.now() % 2400) / 2400;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6 + t * 24, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(59,130,246,${0.32 * (1 - t)})`;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fill();
+          ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+        }
+
+        function render() {
+          if (!ctx || !stageW) return;
+          ctx.clearRect(0, 0, stageW, stageH);
+          const g = geom();
+          drawTiles(g, baseUrl, 1);
+          drawWeatherFrames(g);
+          drawAlertPolys(g);
+          drawUserMarker(g);
+          updateTransport(g);
+        }
+
+        let lastTpIdx = -1, lastTpLayer = '';
+        function updateTransport() {
+          const list = currentFrames();
+          if (!list.length) return;
+          if (frameIdx === lastTpIdx && layer === lastTpLayer) return;
+          lastTpIdx = frameIdx; lastTpLayer = layer;
+          const nIdx = nowIndex();
+          const lastIdx = list.length - 1;
+          const nowPos = lastIdx > 0 ? nIdx / lastIdx : 1;
+          DOM.radarTrack.style.setProperty('--now-pos', (nowPos * 100).toFixed(1) + '%');
+          DOM.radarScrub.style.left = ((lastIdx > 0 ? frameIdx / lastIdx : 0) * 100).toFixed(1) + '%';
+          const f = list[frameIdx];
+          const dt = new Date(f.time * 1000);
+          const hh = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+          const deltaMin = Math.round((f.time - list[nIdx].time) / 60);
+          const rel = deltaMin === 0 ? 'now' : (deltaMin > 0 ? `+${deltaMin} min` : `${deltaMin} min`);
+          DOM.radarFrameTime.innerHTML = `${hh}<span class="ft-rel">${rel}</span>`;
+        }
+
+        // --- Animation loop --------------------------------------------------
+        function tick(now) {
+          if (!active) { rafId = null; return; }
+          const list = currentFrames();
+          if (playing && !scrubbing && list.length) {
+            const interval = frameIdx === list.length - 1 ? HOLD_LAST_MS : STEP_MS;
+            if (now - lastStep >= interval) {
+              prevIdx = frameIdx;
+              frameIdx = (frameIdx + 1) % list.length;
+              fadeStart = now;
+              lastStep = now;
+            }
+          }
+          render();
+          rafId = requestAnimationFrame(tick);
+        }
+        function startLoop() { if (active && rafId == null) rafId = requestAnimationFrame(tick); }
+        function stopLoop() { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } }
+
+        function setActive(on) {
+          active = on && !document.hidden;
+          if (active) { lastStep = performance.now(); startLoop(); } else { stopLoop(); }
+        }
+
+        // --- Sizing ----------------------------------------------------------
+        function resize() {
+          const r = DOM.radarStage.getBoundingClientRect();
+          if (!r.width) return;
+          stageW = r.width; stageH = r.height;
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          canvas.width = Math.round(stageW * dpr);
+          canvas.height = Math.round(stageH * dpr);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          startLoop();
+        }
+
+        // --- RainViewer index ------------------------------------------------
+        async function loadIndex() {
+          if (indexLoading) return false;
+          indexLoading = true;
+          setStatus('Loading radar…', false);
+          let data;
+          try {
+            const res = await fetch(INDEX_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error('bad status');
+            data = await res.json();
+          } catch {
+            indexLoading = false;
+            showOverlay('Couldn’t reach the radar service', 'Check your connection and try again.', true);
+            setStatus('Radar offline', false);
+            return false;
+          }
+          host = data.host || '';
+          const past = (data.radar?.past || []).map(f => ({ time: f.time, path: f.path, kind: 'past' }));
+          const fut = (data.radar?.nowcast || []).map(f => ({ time: f.time, path: f.path, kind: 'nowcast' }));
+          radarFrames = [...past, ...fut];
+          satFrames = (data.satellite?.infrared || []).map(f => ({ time: f.time, path: f.path, kind: 'past' }));
+          indexLoading = false;
+          const segSat = document.getElementById('segSatellite');
+          if (segSat) {
+            const ok = satFrames.length > 0;
+            segSat.disabled = !ok;
+            segSat.style.opacity = ok ? '' : '0.4';
+            segSat.style.cursor = ok ? '' : 'default';
+          }
+          if (!radarFrames.length) {
+            showOverlay('No radar data available', 'The radar service returned no frames. Try again shortly.', true);
+            return false;
+          }
+          frameIdx = nowIndex();
+          prevIdx = null;
+          lastStep = performance.now();
+          const lastPast = radarFrames.filter(f => f.kind === 'past').pop() || radarFrames[radarFrames.length - 1];
+          setStatus('Live · ' + new Date(lastPast.time * 1000)
+            .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), true);
+          hideOverlay();
+          return true;
+        }
+
+        // --- Nowcast: sample radar intensity at the user's pixel -------------
+        function sampleCanvas() {
+          if (!sampleCanvasEl) {
+            sampleCanvasEl = document.createElement('canvas');
+            sampleCanvasEl.width = TILE; sampleCanvasEl.height = TILE;
+          }
+          return sampleCanvasEl;
+        }
+        function samplePixel(url, px, py) {
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              try {
+                const c = sampleCanvas();
+                const cx = c.getContext('2d', { willReadFrequently: true });
+                cx.clearRect(0, 0, TILE, TILE);
+                cx.drawImage(img, 0, 0, TILE, TILE);
+                const d = cx.getImageData(px, py, 1, 1).data;
+                resolve(d[3] < 8 ? 0 : d[0]);   // transparent => no echo; else brightness ~ dBZ
+              } catch { resolve(-1); }           // CORS-tainted => unknown
+            };
+            img.onerror = () => resolve(0);       // missing tile => no precip there
+            img.src = url;
+          });
+        }
+        function intensityWord(v) {
+          if (v <= 0) return null;
+          if (v < 70) return 'Light precipitation';
+          if (v < 140) return 'Rain';
+          if (v < 210) return 'Heavy rain';
+          return 'Intense storms';
+        }
+        async function computeNowcast() {
+          if (!userLoc || !host || !radarFrames.length) return;
+          const token = ++nowcastToken;
+          const z = SAMPLE_Z;
+          const fx = lon2x(userLoc.lon, z), fy = lat2y(userLoc.lat, z);
+          const tx = Math.floor(fx / TILE), ty = Math.floor(fy / TILE);
+          const px = clamp(Math.floor(fx - tx * TILE), 0, TILE - 1);
+          const py = clamp(Math.floor(fy - ty * TILE), 0, TILE - 1);
+          const past = radarFrames.filter(f => f.kind === 'past').slice(-2);
+          const future = radarFrames.filter(f => f.kind === 'nowcast');
+          const seq = [...past, ...future];
+          const results = [];
+          for (const fr of seq) {
+            const url = `${host}${fr.path}/256/${z}/${tx}/${ty}/0/0_0.png`;
+            const v = await samplePixel(url, px, py);
+            if (token !== nowcastToken) return;   // a newer request superseded us
+            results.push({ time: fr.time, kind: fr.kind, dbz: v });
+          }
+          renderNowcast(results);
+        }
+        function renderNowcast(results) {
+          const usable = results.filter(r => r.dbz >= 0);
+          if (usable.length < 1) { DOM.nowcastBanner.hidden = true; return; }
+          const past = results.filter(r => r.kind === 'past' && r.dbz >= 0);
+          const future = results.filter(r => r.kind === 'nowcast' && r.dbz >= 0);
+          const cur = past[past.length - 1] || usable[usable.length - 1];
+          let head, sub, cls;
+          if (cur.dbz > 0) {
+            const word = intensityWord(cur.dbz);
+            head = `${word} overhead now`;
+            const prev = past.length >= 2 ? past[past.length - 2] : null;
+            let trend = '';
+            if (prev) {
+              if (cur.dbz > prev.dbz + 12) trend = 'Intensifying. ';
+              else if (cur.dbz < prev.dbz - 12) trend = 'Easing. ';
+              else trend = 'Holding steady. ';
+            }
+            const clearF = future.find(f => f.dbz <= 0);
+            if (clearF) {
+              sub = `${trend}Likely to clear in ~${Math.round((clearF.time - cur.time) / 60)} min.`;
+            } else if (future.length) {
+              sub = `${trend}Still on radar through +${Math.round((future[future.length - 1].time - cur.time) / 60)} min.`;
+            } else {
+              sub = trend || 'Precipitation detected over your location.';
+            }
+            cls = cur.dbz >= 140 ? 'is-imminent' : 'is-active';
+          } else {
+            const arr = future.find(f => f.dbz > 0);
+            if (arr) {
+              const m = Math.round((arr.time - cur.time) / 60);
+              head = `${intensityWord(arr.dbz) || 'Precipitation'} in ~${m} min`;
+              sub = 'Approaching your location on radar.';
+              cls = m <= 15 ? 'is-imminent' : 'is-active';
+            } else {
+              const horizon = future.length ? Math.round((future[future.length - 1].time - cur.time) / 60) : 30;
+              head = 'No precipitation reaching you';
+              sub = `Nothing on radar within the next ${horizon} min.`;
+              cls = 'is-clear';
+            }
+          }
+          DOM.nowcastHead.textContent = head;
+          DOM.nowcastSub.textContent = sub;
+          DOM.nowcastBanner.className = 'nowcast ' + cls;
+          DOM.nowcastBanner.hidden = false;
+          DOM.nowcastSpark.innerHTML = results.map(r => {
+            const h = r.dbz <= 0 ? 3 : Math.round(Math.max(4, Math.min(30, (r.dbz / 255) * 30)));
+            return `<span class="nb ${r.kind === 'nowcast' ? 'future' : ''}" style="height:${h}px"></span>`;
+          }).join('');
+        }
+
+        // --- Status / overlay helpers ---------------------------------------
+        function setStatus(text, live) {
+          DOM.radarStatusText.textContent = text;
+          const dot = DOM.radarStatus.querySelector('.radar-live-dot');
+          if (dot) dot.style.display = live ? '' : 'none';
+        }
+        function showOverlay(title, body, retry) {
+          DOM.radarOverlayMsg.hidden = false;
+          DOM.radarOverlayMsg.innerHTML =
+            `<div class="om-title">${escapeHtml(title)}</div><div>${escapeHtml(body)}</div>` +
+            (retry ? '<button type="button" id="radarRetry">Retry</button>' : '');
+          if (retry) {
+            const b = document.getElementById('radarRetry');
+            if (b) b.addEventListener('click', () => { hideOverlay(); initialized = false; activate(); });
+          }
+        }
+        function hideOverlay() { DOM.radarOverlayMsg.hidden = true; DOM.radarOverlayMsg.innerHTML = ''; }
+
+        // --- Interaction -----------------------------------------------------
+        function panBy(dx, dy) {
+          const g = geom();
+          const cx = lon2x(view.lon, g.tz) - dx / g.scale;
+          const cy = lat2y(clampLat(view.lat), g.tz) - dy / g.scale;
+          let lon = x2lon(cx, g.tz);
+          lon = ((lon + 180) % 360 + 360) % 360 - 180;
+          view.lon = lon;
+          view.lat = clampLat(y2lat(cy, g.tz));
+          startLoop();
+        }
+        function zoomAround(px, py, newZoom) {
+          newZoom = clamp(newZoom, MIN_Z, MAX_Z);
+          if (newZoom === view.zoom) return;
+          const before = unproject(px, py, geom());
+          view.zoom = newZoom;
+          const after = unproject(px, py, geom());
+          view.lon += before.lon - after.lon;
+          view.lat = clampLat(view.lat + (before.lat - after.lat));
+          startLoop();
+        }
+        function setPlaying(p) {
+          playing = p;
+          DOM.radarPlay.querySelector('.ic-play').hidden = p;
+          DOM.radarPlay.querySelector('.ic-pause').hidden = !p;
+          if (p) { lastStep = performance.now(); startLoop(); }
+        }
+        function setLayer(l) {
+          if (l === layer) return;
+          if (l === 'satellite' && !satFrames.length) return;
+          layer = l;
+          [...DOM.radarLayerToggle.children].forEach(b => b.classList.toggle('active', b.dataset.layer === l));
+          DOM.radarLegend.classList.toggle('satellite', l === 'satellite');
+          frameIdx = nowIndex();
+          prevIdx = null;
+          startLoop();
+        }
+
+        function bindEvents() {
+          if (bound) return;
+          bound = true;
+          const stage = DOM.radarStage;
+          const pointers = new Map();
+          let drag = null, pinch = null;
+          const offset = (e) => {
+            const r = stage.getBoundingClientRect();
+            return { x: e.clientX - r.left, y: e.clientY - r.top };
+          };
+          const onUi = (e) => e.target.closest(
+            '.radar-controls,.radar-transport,.radar-segment,.radar-overlay-msg,.radar-legend,.radar-status');
+
+          stage.addEventListener('pointerdown', (e) => {
+            if (onUi(e)) return;
+            e.preventDefault();
+            stage.setPointerCapture(e.pointerId);
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.size === 1) { drag = { x: e.clientX, y: e.clientY }; stage.classList.add('dragging'); }
+            else if (pointers.size === 2) {
+              const p = [...pointers.values()];
+              pinch = { dist: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), zoom: view.zoom };
+              drag = null;
+            }
+          });
+          stage.addEventListener('pointermove', (e) => {
+            if (!pointers.has(e.pointerId)) return;
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.size >= 2 && pinch) {
+              const p = [...pointers.values()];
+              const dist = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+              const r = stage.getBoundingClientRect();
+              const mx = (p[0].x + p[1].x) / 2 - r.left, my = (p[0].y + p[1].y) / 2 - r.top;
+              zoomAround(mx, my, pinch.zoom + Math.log2(dist / pinch.dist));
+            } else if (drag) {
+              panBy(e.clientX - drag.x, e.clientY - drag.y);
+              drag.x = e.clientX; drag.y = e.clientY;
+            }
+          });
+          const endPointer = (e) => {
+            pointers.delete(e.pointerId);
+            if (pointers.size < 2) pinch = null;
+            if (pointers.size === 0) { drag = null; stage.classList.remove('dragging'); }
+          };
+          stage.addEventListener('pointerup', endPointer);
+          stage.addEventListener('pointercancel', endPointer);
+          stage.addEventListener('wheel', (e) => {
+            if (onUi(e)) return;
+            e.preventDefault();
+            const o = offset(e);
+            zoomAround(o.x, o.y, view.zoom - e.deltaY * 0.0016);
+          }, { passive: false });
+          stage.addEventListener('dblclick', (e) => {
+            if (onUi(e)) return;
+            const o = offset(e);
+            zoomAround(o.x, o.y, view.zoom + 1);
+          });
+
+          DOM.radarControls.in.addEventListener('click', () => zoomAround(stageW / 2, stageH / 2, view.zoom + 1));
+          DOM.radarControls.out.addEventListener('click', () => zoomAround(stageW / 2, stageH / 2, view.zoom - 1));
+          DOM.radarControls.recenter.addEventListener('click', () => {
+            if (!userLoc) return;
+            view = { lat: userLoc.lat, lon: userLoc.lon, zoom: DEFAULT_Z };
+            startLoop();
+          });
+          DOM.radarPlay.addEventListener('click', () => setPlaying(!playing));
+          DOM.radarLayerToggle.addEventListener('click', (e) => {
+            const btn = e.target.closest('.seg-btn');
+            if (btn && !btn.disabled) setLayer(btn.dataset.layer);
+          });
+
+          const scrubTo = (e) => {
+            const r = DOM.radarTimeline.getBoundingClientRect();
+            const frac = clamp((e.clientX - r.left) / r.width, 0, 1);
+            const list = currentFrames();
+            if (!list.length) return;
+            frameIdx = Math.round(frac * (list.length - 1));
+            prevIdx = null;
+            startLoop();
+          };
+          DOM.radarTimeline.addEventListener('pointerdown', (e) => {
+            scrubbing = true; setPlaying(false);
+            DOM.radarTimeline.setPointerCapture(e.pointerId);
+            scrubTo(e);
+          });
+          DOM.radarTimeline.addEventListener('pointermove', (e) => { if (scrubbing) scrubTo(e); });
+          const stopScrub = () => { scrubbing = false; };
+          DOM.radarTimeline.addEventListener('pointerup', stopScrub);
+          DOM.radarTimeline.addEventListener('pointercancel', stopScrub);
+
+          document.addEventListener('visibilitychange', () => setActive(tabOpen));
+        }
+
+        // --- Public lifecycle ------------------------------------------------
+        async function activate() {
+          tabOpen = true;
+          canvas = DOM.radarCanvas;
+          ctx = canvas.getContext('2d');
+          if (!ctx) { showOverlay('Radar unavailable', 'This browser can’t render the radar canvas.', false); return; }
+          bindEvents();
+          if (!userLoc) {
+            showOverlay('Set your location', 'Enter a ZIP code to see live radar for your area.', false);
+            setStatus('No location', false);
+            return;
+          }
+          resize();
+          if (!resizeObs && window.ResizeObserver) {
+            resizeObs = new ResizeObserver(() => resize());
+            resizeObs.observe(DOM.radarStage);
+          } else if (!resizeObs) {
+            window.addEventListener('resize', resize);
+            resizeObs = true;
+          }
+          setActive(true);
+          if (!initialized) {
+            initialized = await loadIndex();
+            if (initialized) computeNowcast();
+          }
+        }
+        function deactivate() { tabOpen = false; setActive(false); }
+
+        function setLocation(loc, alertGeo) {
+          alertPolys = Array.isArray(alertGeo) ? alertGeo : [];
+          DOM.radarBadge.classList.toggle('hidden', alertPolys.length === 0);
+          const changed = !userLoc || userLoc.lat !== loc.lat || userLoc.lon !== loc.lon;
+          userLoc = loc;
+          if (changed) { view = { lat: loc.lat, lon: loc.lon, zoom: DEFAULT_Z }; nowcastToken++; }
+          if (tabOpen) {
+            hideOverlay();
+            resize();
+            setActive(true);
+            if (!initialized) {
+              loadIndex().then((ok) => { initialized = ok; if (ok) computeNowcast(); });
+            } else {
+              computeNowcast();
+            }
+          }
+        }
+
+        return { activate, deactivate, setLocation };
+      })();
+
       function switchTab(tabName) {
         DOM.tabs.forEach(tab => {
           tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -4410,6 +5460,8 @@
         DOM.tabContents.forEach(content => {
           content.classList.toggle('active', content.id === `tab-${tabName}`);
         });
+        if (tabName === 'radar') RadarMap.activate();
+        else RadarMap.deactivate();
       }
 
       // Global functions for alert interactions
